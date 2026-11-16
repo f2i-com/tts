@@ -3242,10 +3242,12 @@ async function main() {
     $("dictStatus").textContent = "Loading dictionary…";
     try {
       let text = null;
-      try {
-        const localRes = await fetch("../tools/.cache/cmudict.dict");
-        if (localRes.ok) text = await localRes.text();
-      } catch {}
+      if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+        try {
+          const localRes = await fetch("../tools/.cache/cmudict.dict");
+          if (localRes.ok) text = await localRes.text();
+        } catch {}
+      }
       if (!text) {
         const remoteRes = await fetch("https://raw.githubusercontent.com/cmusphinx/cmudict/master/cmudict.dict");
         if (!remoteRes.ok) throw new Error(`HTTP ${remoteRes.status}`);

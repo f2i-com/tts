@@ -306,12 +306,12 @@ Measured on unseen held-out sentences against real human recordings (CMU Arctic)
 
 ---
 
-## Build, Test & Run Demo Locally
+## Build, Test & Static Hosting Deployment
 
 Requires Rust (with `rustup target add wasm32-unknown-unknown`) and Node.js 18+:
 
 ```sh
-npm run build      # builds self-contained pkg/tts.wasm + pkg/tts.js + pkg/tts.d.ts
+npm run build      # builds pkg/ AND an upload-ready static site in dist/
 npm test           # runs Rust release unit tests + Node WASM smoke tests
 npm run demo       # starts local studio at http://localhost:8080/demo/
 
@@ -320,6 +320,8 @@ cargo run --release --example say -- --voice female "Hello from TTS!" hello.wav
 cargo run --release --example say -- --script "[female, excited] Hi! [deep] Hello." scene.wav
 cargo run --release --example say -- --sing "[bpm=112] C4:1=Shine E4:1=on G4:2=bright" song.wav
 ```
+
+To deploy the demo to any static web host (Cloudflare Pages, Netlify, Vercel, S3, Apache/Nginx root, or a subfolder), upload the contents of **`dist/`** (`index.html`, `app.js`, `styles.css`, `tts.wasm`, `tts.js`, `tts.d.ts`, `_headers`, `profiles/`). Every asset path inside `dist/` is `./`-relative so it works at `/` or in any subdirectory with zero server configuration.
 
 ---
 
