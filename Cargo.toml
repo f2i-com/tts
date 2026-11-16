@@ -1,0 +1,25 @@
+[package]
+name = "tts"
+version = "1.0.0"
+edition = "2021"
+homepage = "https://tts.computer"
+repository = "https://github.com/f2i-com/tts"
+description = "TTS (tts.computer): physical human vocal-tract speech & singing synthesizer in Rust and self-contained WebAssembly. Zero models, zero samples, zero dependencies."
+keywords = ["tts", "speech-synthesis", "wasm", "formant", "singing"]
+categories = ["multimedia::audio", "wasm"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# Development hooks for the measuring tools in tools/: engine constants can be overridden
+# through the VS_TUNE environment variable, and a few VS_*_FILE variables read or write
+# files. Off by default: a library should not listen to the environment.
+dev-hooks = []
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = "symbols"

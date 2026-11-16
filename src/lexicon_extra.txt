@@ -1,0 +1,123 @@
+# Supplement to the hand-tuned core lexicon: every word the text normalizer can
+# emit (numbers, ordinals, symbols, letter names), a few contractions, and
+# sensible defaults for common heteronyms. Format: word PH PH ... (ARPAbet).
+
+# --- numbers & symbols ---
+oh OW1
+point P OY1 N T
+percent P ER0 S EH1 N T
+plus P L AH1 S
+minus M AY1 N AX S
+equals IY1 K W AX L Z
+trillion T R IH1 L Y AX N
+dollar D AA1 L ER0
+dollars D AA1 L ER0 Z
+cent S EH1 N T
+cents S EH1 N T S
+pound P AW1 N D
+pounds P AW1 N D Z
+euro Y UH1 R OW0
+euros Y UH1 R OW0 Z
+twelfth T W EH1 L F TH
+eleventh IH0 L EH1 V AX N TH
+thirteenth TH ER1 T IY2 N TH
+fourteenth F AO1 R T IY2 N TH
+fifteenth F IH1 F T IY2 N TH
+sixteenth S IH1 K S T IY2 N TH
+seventeenth S EH1 V AX N T IY2 N TH
+eighteenth EY1 T IY2 N TH
+nineteenth N AY1 N T IY2 N TH
+twentieth T W EH1 N T IY0 AX TH
+thirtieth TH ER1 T IY0 AX TH
+fortieth F AO1 R T IY0 AX TH
+fiftieth F IH1 F T IY0 AX TH
+sixtieth S IH1 K S T IY0 AX TH
+seventieth S EH1 V AX N T IY0 AX TH
+eightieth EY1 T IY0 AX TH
+ninetieth N AY1 N T IY0 AX TH
+hundredth HH AH1 N D R AX D TH
+thousandth TH AW1 Z AX N TH
+millionth M IH1 L Y AX N TH
+billionth B IH1 L Y AX N TH
+trillionth T R IH1 L Y AX N TH
+
+# --- abbreviations the normalizer expands ---
+mister M IH1 S T ER0
+missus M IH1 S AX Z
+miss M IH1 S
+doctor D AA1 K T ER0
+versus V ER1 S AX S
+et EH1 T
+cetera S EH1 T ER0 AX
+text T EH1 K S T
+
+# --- letter names (acronyms are spelled with these) ---
+ay EY1
+bee B IY1
+dee D IY1
+ee IY1
+eff EH1 F
+gee JH IY1
+aitch EY1 CH
+jay JH EY1
+kay K EY1
+ell EH1 L
+em EH1 M
+en EH1 N
+pee P IY1
+cue K Y UW1
+ar AA1 R
+ess EH1 S
+tee T IY1
+vee V IY1
+double D AH1 B AX L
+ex EH1 K S
+zee Z IY1
+
+# --- vowel-less interjections (would otherwise be spelled out letter by letter) ---
+hm HH AH1 M
+hmm HH AH1 M
+hmmm HH AH1 M
+mm AH1 M
+mmm AH1 M
+mhm AX M HH AH1 M
+sh SH
+shh SH
+shhh SH
+psst P S T
+brr B ER1
+grr G ER1
+tsk T IH1 S K
+zzz Z
+
+# --- contractions missing from the core list ---
+ain't EY1 N T
+shan't SH AE1 N T
+mustn't M AH1 S AX N T
+needn't N IY1 D AX N T
+y'all Y AO1 L
+o'clock AX K L AA1 K
+ma'am M AE1 M
+
+# --- heteronyms: prefer the reading that is right more often in running text ---
+read R IY1 D
+lead L IY1 D
+wind W IH1 N D
+json JH EY1 S AX N
+wasm W AA1 Z AX M
+wifi W AY1 F AY2
+linux L IH1 N AX K S
+github G IH1 T HH AH2 B
+javascript JH AA1 V AX S K R IH2 P T
+jpeg JH EY1 P EH2 G
+gif G IH1 F
+emoji IH M OW1 JH IY
+youtube Y UW1 T UW2 B
+iphone AY1 F OW2 N
+ipad AY1 P AE2 D
+podcast P AA1 D K AE2 S T
+login L AO1 G IH2 N
+username Y UW1 Z ER N EY2 M
+website W EH1 B S AY2 T
+online AA1 N L AY2 N
+email IY1 M EY2 L

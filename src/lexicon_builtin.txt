@@ -1,0 +1,687 @@
+a AX
+an AE1 N
+the DH AX
+this DH IH1 S
+that DH AE1 T
+these DH IY1 Z
+those DH OW1 Z
+i AY1
+me M IY1
+my M AY1
+mine M AY1 N
+myself M AY0 S EH1 L F
+you Y UW1
+your Y AO1 R
+yours Y AO1 R Z
+yourself Y UH0 R S EH1 L F
+he HH IY1
+him HH IH1 M
+his HH IH1 Z
+himself HH IH0 M S EH1 L F
+she SH IY1
+her HH ER1
+hers HH ER1 Z
+herself HH ER0 S EH1 L F
+it IH1 T
+its IH1 T S
+itself IH0 T S EH1 L F
+we W IY1
+us AH1 S
+our AW1 ER
+ours AW1 ER Z
+ourselves AW0 ER S EH1 L V Z
+they DH EY1
+them DH EH1 M
+their DH EH1 R
+theirs DH EH1 R Z
+themselves DH EH0 M S EH1 L V Z
+am AE1 M
+is IH1 Z
+are AA1 R
+was W AA1 Z
+were W ER1
+be B IY1
+been B IH1 N
+being B IY1 IH0 NG
+have HH AE1 V
+has HH AE1 Z
+had HH AE1 D
+having HH AE1 V IH0 NG
+do D UW1
+does D AH1 Z
+did D IH1 D
+done D AH1 N
+doing D UW1 IH0 NG
+will W IH1 L
+would W UH1 D
+shall SH AE1 L
+should SH UH1 D
+can K AE1 N
+could K UH1 D
+may M EY1
+might M AY1 T
+must M AH1 S T
+ought AO1 T
+not N AA1 T
+no N OW1
+yes Y EH1 S
+yeah Y AE1
+yep Y EH1 P
+nope N OW1 P
+okay OW0 K EY1
+ok OW0 K EY1
+and AE0 N D
+or AO0 R
+but B AH0 T
+if IH0 F
+so S OW1
+yet Y EH1 T
+nor N AO1 R
+in IH0 N
+on AA1 N
+at AE0 T
+to T UW0
+for F AO0 R
+of AX0 V
+from F R AH0 M
+by B AY1
+with W IH0 DH
+about AX B AW1 T
+into IH1 N T UW0
+onto AA1 N T UW0
+out AW1 T
+up AH1 P
+down D AW1 N
+over OW1 V ER
+under AH1 N D ER
+through TH R UW1
+between B IH0 T W IY1 N
+among AX M AH1 NG
+before B IH0 F AO1 R
+after AE1 F T ER
+during D UH1 R IH0 NG
+without W IH0 DH AW1 T
+within W IH0 DH IH1 N
+around AX R AW1 N D
+across AX K R AO1 S
+behind B IH0 HH AY1 N D
+beyond B IH0 Y AA1 N D
+near N IH1 R
+off AO1 F
+above AX B AH1 V
+below B IH0 L OW1
+against AX G EH1 N S T
+toward T AX W AO1 R D
+towards T AX W AO1 R D Z
+upon AX P AA1 N
+until AH0 N T IH1 L
+what W AA1 T
+where W EH1 R
+when W EH1 N
+why W AY1
+who HH UW1
+whom HH UW1 M
+whose HH UW1 Z
+which W IH1 CH
+how HH AW1
+all AO1 L
+any EH1 N IY0
+some S AH1 M
+many M EH1 N IY0
+much M AH1 CH
+more M AO1 R
+most M OW1 S T
+other AH1 DH ER
+another AX N AH1 DH ER
+such S AH1 CH
+only OW1 N L IY0
+own OW1 N
+same S EY1 M
+each IY1 CH
+every EH1 V R IY0
+both B OW1 TH
+few F Y UW1
+several S EH1 V ER AX L
+enough IH0 N AH1 F
+very V EH1 R IY0
+really R IY1 L IY0
+quite K W AY1 T
+too T UW1
+also AO1 L S OW0
+just JH AH1 S T
+now N AW1
+then DH EH1 N
+here HH IH1 R
+there DH EH1 R
+always AO1 L W EY0 Z
+never N EH1 V ER
+often AO1 F AX N
+sometimes S AH1 M T AY2 M Z
+usually Y UW1 ZH UW0 AX L IY0
+already AO0 L R EH1 D IY0
+still S T IH1 L
+again AX G EH1 N
+together T AX G EH1 DH ER
+almost AO1 L M OW0 S T
+today T AX D EY1
+tomorrow T AX M AA1 R OW0
+yesterday Y EH1 S T ER D EY2
+tonight T AX N AY1 T
+maybe M EY1 B IY0
+perhaps P ER HH AE1 P S
+actually AE1 K CH UW0 AX L IY0
+probably P R AA1 B AX B L IY0
+because B IH0 K AO1 Z
+though DH OW1
+although AO0 L DH OW1
+however HH AW0 EH1 V ER
+while W AY1 L
+since S IH1 N S
+once W AH1 N S
+twice T W AY1 S
+ever EH1 V ER
+else EH1 L S
+well W EH1 L
+even IY1 V AX N
+back B AE1 K
+away AX W EY1
+far F AA1 R
+soon S UW1 N
+zero Z IH1 R OW0
+one W AH1 N
+two T UW1
+three TH R IY1
+four F AO1 R
+five F AY1 V
+six S IH1 K S
+seven S EH1 V AX N
+eight EY1 T
+nine N AY1 N
+ten T EH1 N
+eleven IH0 L EH1 V AX N
+twelve T W EH1 L V
+thirteen TH ER1 T IY2 N
+fourteen F AO1 R T IY2 N
+fifteen F IH1 F T IY2 N
+sixteen S IH1 K S T IY2 N
+seventeen S EH1 V AX N T IY2 N
+eighteen EY1 T IY2 N
+nineteen N AY1 N T IY2 N
+twenty T W EH1 N T IY0
+thirty TH ER1 T IY0
+forty F AO1 R T IY0
+fifty F IH1 F T IY0
+sixty S IH1 K S T IY0
+seventy S EH1 V AX N T IY0
+eighty EY1 T IY0
+ninety N AY1 N T IY0
+hundred HH AH1 N D R AX D
+thousand TH AW1 Z AX N D
+million M IH1 L Y AX N
+billion B IH1 L Y AX N
+first F ER1 S T
+second S EH1 K AX N D
+third TH ER1 D
+fourth F AO1 R TH
+fifth F IH1 F TH
+sixth S IH1 K S TH
+seventh S EH1 V AX N TH
+eighth EY1 T TH
+ninth N AY1 N TH
+tenth T EH1 N TH
+hello HH EH0 L OW1
+hi HH AY1
+hey HH EY1
+greetings G R IY1 T IH0 NG Z
+welcome W EH1 L K AX M
+goodbye G UH2 D B AY1
+bye B AY1
+please P L IY1 Z
+thanks TH AE1 NG K S
+thank TH AE1 NG K
+sorry S AA1 R IY0
+excuse IH0 K S K Y UW1 S
+pardon P AA1 R D AX N
+awesome AO1 S AX M
+voice V OY1 S
+voices V OY1 S IH0 Z
+vocal V OW1 K AX L
+mouth M AW1 TH
+lips L IH1 P S
+lip L IH1 P
+tongue T AH1 NG
+jaw JH AO1
+teeth T IY1 TH
+tooth T UW1 TH
+throat TH R OW1 T
+lungs L AH1 NG Z
+breath B R EH1 TH
+breathe B R IY1 DH
+breathing B R IY1 DH IH0 NG
+air EH1 R
+airflow EH1 R F L OW2
+sound S AW1 N D
+sounds S AW1 N D Z
+speak S P IY1 K
+speaking S P IY1 K IH0 NG
+spoke S P OW1 K
+spoken S P OW1 K AX N
+speech S P IY1 CH
+talk T AO1 K
+talking T AO1 K IH0 NG
+say S EY1
+says S EH1 Z
+said S EH1 D
+word W ER1 D
+words W ER1 D Z
+sentence S EH1 N T AX N S
+sentences S EH1 N T AX N S IH0 Z
+language L AE1 NG G W IH0 JH
+human HH Y UW1 M AX N
+humans HH Y UW1 M AX N Z
+person P ER1 S AX N
+people P IY1 P AX L
+synthetic S IH0 N TH EH1 T IH0 K
+artificial AA2 R T AX F IH1 SH AX L
+artificially AA2 R T AX F IH1 SH AX L IY0
+simulator S IH1 M Y AX0 L EY2 T ER0
+simulation S IH2 M Y AX0 L EY1 SH AX N
+simulate S IH1 M Y AX0 L EY2 T
+simulated S IH1 M Y AX0 L EY2 T IH0 D
+avatar AE1 V AX T AA2 R
+male M EY1 L
+female F IY1 M EY2 L
+pitch P IH1 CH
+pitches P IH1 CH IH0 Z
+frequency F R IY1 K W AX N S IY0
+formant F AO1 R M AX N T
+formants F AO1 R M AX N T S
+resonance R EH1 Z AX N AX N S
+resonant R EH1 Z AX N AX N T
+phoneme F OW1 N IY2 M
+phonemes F OW1 N IY2 M Z
+vowel V AW1 AX L
+vowels V AW1 AX L Z
+consonant K AA1 N S AX N AX N T
+consonants K AA1 N S AX N AX N T S
+syllable S IH1 L AX B AX L
+syllables S IH1 L AX B AX L Z
+intonation IH2 N T AX N EY1 SH AX N
+prosody P R AA1 S AX D IY0
+whisper W IH1 S P ER
+whispering W IH1 S P ER IH0 NG
+sing S IH1 NG
+singing S IH1 NG IH0 NG
+song S AO1 NG
+music M Y UW1 Z IH0 K
+tone T OW1 N
+audio AO1 D IY0 OW0
+studio S T UW1 D IY0 OW0
+microphone M AY1 K R AX F OW2 N
+code K OW1 D
+computer K AX M P Y UW1 T ER0
+digital D IH1 JH IH0 T AX L
+physics F IH1 Z IH0 K S
+physical F IH1 Z IH0 K AX L
+soft S AO1 F T
+palate P AE1 L AX T
+larynx L AE1 R IH0 NG K S
+glottis G L AA1 T IH0 S
+glottal G L AA1 T AX L
+acoustic AX K UW1 S T IH0 K
+realistic R IY2 AX L IH1 S T IH0 K
+real R IY1 L
+listen L IH1 S AX N
+hear HH IH1 R
+heard HH ER1 D
+reply R IH0 P L AY1
+replies R IH0 P L AY1 Z
+answer AE1 N S ER
+question K W EH1 S CH AX N
+message M EH1 S IH0 JH
+messages M EH1 S IH0 JH IH0 Z
+chat CH AE1 T
+type T AY1 P
+settings S EH1 T IH0 NG Z
+change CH EY1 N JH
+animate AE1 N AX M EY2 T
+animated AE1 N AX M EY2 T IH0 D
+animation AE2 N AX M EY1 SH AX N
+animations AE2 N AX M EY1 SH AX N Z
+sync S IH1 NG K
+synced S IH1 NG K T
+freeze F R IY1 Z
+freezes F R IY1 Z IH0 Z
+stream S T R IY1 M
+streaming S T R IY1 M IH0 NG
+continuous K AX N T IH1 N Y UW0 AX S
+paragraph P AE1 R AX G R AE2 F
+conversation K AA2 N V ER S EY1 SH AX N
+quick K W IH1 K
+brown B R AW1 N
+fox F AA1 K S
+jumps JH AH1 M P S
+jump JH AH1 M P
+lazy L EY1 Z IY0
+dog D AO1 G
+dogs D AO1 G Z
+cat K AE1 T
+cats K AE1 T S
+good G UH1 D
+great G R EY1 T
+best B EH1 S T
+better B EH1 T ER
+bad B AE1 D
+worse W ER1 S
+worst W ER1 S T
+new N UW1
+old OW1 L D
+young Y AH1 NG
+big B IH1 G
+small S M AO1 L
+little L IH1 T AX L
+large L AA1 R JH
+long L AO1 NG
+short SH AO1 R T
+high HH AY1
+low L OW1
+deep D IY1 P
+bright B R AY1 T
+warm W AO1 R M
+hard HH AA1 R D
+clear K L IH1 R
+fast F AE1 S T
+slow S L OW1
+easy IY1 Z IY0
+happy HH AE1 P IY0
+nice N AY1 S
+cool K UW1 L
+beautiful B Y UW1 T AX F AX L
+wonderful W AH1 N D ER F AX L
+amazing AX M EY1 Z IH0 NG
+interesting IH1 N T R AX S T IH0 NG
+different D IH1 F R AX N T
+important IH0 M P AO1 R T AX N T
+ready R EH1 D IY0
+sure SH UH1 R
+true T R UW1
+false F AO1 L S
+right R AY1 T
+wrong R AO1 NG
+left L EH1 F T
+full F UH1 L
+empty EH1 M P T IY0
+open OW1 P AX N
+close K L OW1 S
+closed K L OW1 Z D
+know N OW1
+knew N UW1
+known N OW1 N
+think TH IH1 NG K
+thought TH AO1 T
+feel F IY1 L
+felt F EH1 L T
+see S IY1
+saw S AO1
+seen S IY1 N
+look L UH1 K
+looking L UH1 K IH0 NG
+watch W AA1 CH
+want W AA1 N T
+need N IY1 D
+like L AY1 K
+love L AH1 V
+make M EY1 K
+made M EY1 D
+making M EY1 K IH0 NG
+take T EY1 K
+took T UH1 K
+taken T EY1 K AX N
+give G IH1 V
+gave G EY1 V
+given G IH1 V AX N
+come K AH1 M
+came K EY1 M
+coming K AH1 M IH0 NG
+go G OW1
+went W EH1 N T
+gone G AO1 N
+going G OW1 IH0 NG
+get G EH1 T
+got G AA1 T
+find F AY1 N D
+found F AW1 N D
+tell T EH1 L
+told T OW1 L D
+ask AE1 S K
+work W ER1 K
+works W ER1 K S
+working W ER1 K IH0 NG
+play P L EY1
+playing P L EY1 IH0 NG
+try T R AY1
+use Y UW1 Z
+using Y UW1 Z IH0 NG
+used Y UW1 Z D
+help HH EH1 L P
+show SH OW1
+move M UW1 V
+moving M UW1 V IH0 NG
+live L IH1 V
+life L AY1 F
+world W ER1 L D
+time T AY1 M
+day D EY1
+night N AY1 T
+morning M AO1 R N IH0 NG
+evening IY1 V N IH0 NG
+year Y IH1 R
+years Y IH1 R Z
+water W AO1 T ER
+fire F AY1 ER
+earth ER1 TH
+sky S K AY1
+sun S AH1 N
+moon M UW1 N
+light L AY1 T
+friend F R EH1 N D
+friends F R EH1 N D Z
+heart HH AA1 R T
+mind M AY1 N D
+head HH EH1 D
+face F EY1 S
+eyes AY1 Z
+eye AY1
+hand HH AE1 N D
+name N EY1 M
+place P L EY1 S
+home HH OW1 M
+house HH AW1 S
+game G EY1 M
+games G EY1 M Z
+story S T AO1 R IY0
+joke JH OW1 K
+jokes JH OW1 K S
+laugh L AE1 F
+smile S M AY1 L
+science S AY1 AX N S
+machine M AX SH IY1 N
+nature N EY1 CH ER
+future F Y UW1 CH ER
+create K R IY0 EY1 T
+created K R IY0 EY1 T IH0 D
+build B IH1 L D
+built B IH1 L T
+everything EH1 V R IY0 TH IH2 NG
+something S AH1 M TH IH0 NG
+nothing N AH1 TH IH0 NG
+anything EH1 N IY0 TH IH2 NG
+everyone EH1 V R IY0 W AH2 N
+someone S AH1 M W AH2 N
+anyone EH1 N IY0 W AH2 N
+idea AY0 D IY1 AX
+example IH0 G Z AE1 M P AX L
+system S IH1 S T AX M
+body B AA1 D IY0
+power P AW1 ER
+energy EH1 N ER JH IY0
+weather W EH1 DH ER
+color K AH1 L ER
+colour K AH1 L ER
+able EY1 B AX L
+peter P IY1 T ER
+piper P AY1 P ER
+picked P IH1 K T
+peck P EH1 K
+pickled P IH1 K AX L D
+peppers P EH1 P ER Z
+seashells S IY1 SH EH2 L Z
+seashore S IY1 SH AO2 R
+sells S EH1 L Z
+woodchuck W UH1 D CH AH2 K
+chuck CH AH1 K
+wood W UH1 D
+understand AH2 N D ER S T AE1 N D
+believe B IH0 L IY1 V
+wonder W AH1 N D ER
+remember R IH0 M EH1 M B ER
+favorite F EY1 V R IH0 T
+favourite F EY1 V R IH0 T
+number N AH1 M B ER
+count K AW1 N T
+higher HH AY1 ER
+lower L OW1 ER
+deeper D IY1 P ER
+faster F AE1 S T ER
+slower S L OW1 ER
+quiet K W AY1 AX T
+loud L AW1 D
+clearly K L IH1 R L IY0
+natural N AE1 CH ER AX L
+naturally N AE1 CH ER AX L IY0
+cords K AO1 R D Z
+folds F OW1 L D Z
+tract T R AE1 K T
+model M AA1 D AX L
+blender B L EH1 N D ER0
+pulse P AH1 L S
+pulses P AH1 L S IH0 Z
+pulsing P AH1 L S IH0 NG
+vibrate V AY1 B R EY2 T
+vibrating V AY1 B R EY2 T IH0 NG
+resonances R EH1 Z AX N AX N S IH0 Z
+radiation R EY2 D IY0 EY1 SH AX N
+nasal N EY1 Z AX L
+oral AO1 R AX L
+cavity K AE1 V AX T IY0
+cavities K AE1 V AX T IY0 Z
+oscillation AA2 S AX L EY1 SH AX N
+turbulence T ER1 B Y AX L AX N S
+turbulent T ER1 B Y AX L AX N T
+articulation AA2 R T IH2 K Y AX L EY1 SH AX N
+articulate AA0 R T IH1 K Y AX L EY2 T
+articulators AA0 R T IH1 K Y AX L EY2 T ER Z
+baritone B AE1 R AX T OW2 N
+tenor T EH1 N ER
+soprano S AX P R AE1 N OW0
+alto AE1 L T OW0
+bass B EY1 S
+hertz HH ER1 T S
+kilohertz K IH1 L AX HH ER2 T S
+decibels D EH1 S AX B AX L Z
+centimeters S EH1 N T AX M IY2 T ER Z
+organ AO1 R G AX N
+slider S L AY1 D ER
+sliders S L AY1 D ER Z
+toggle T AA1 G AX L
+preset P R IY1 S EH2 T
+presets P R IY1 S EH2 T S
+character K AE1 R IH0 K T ER
+skeleton S K EH1 L AX T AX N
+heaps HH IY1 P S
+mate M EY1 T
+cheers CH IH1 R Z
+robot R OW1 B AA2 T
+robots R OW1 B AA2 T S
+robotic R OW0 B AA1 T IH0 K
+alive AX L AY1 V
+conscious K AA1 N SH AX S
+feelings F IY1 L IH0 NG Z
+brain B R EY1 N
+melody M EH1 L AX D IY0
+harmony HH AA1 R M AX N IY0
+rhythm R IH1 DH AX M
+plosive P L OW1 S IH0 V
+plosives P L OW1 S IH0 V Z
+fricative F R IH1 K AX T IH0 V
+fricatives F R IH1 K AX T IH0 V Z
+alveolar AE2 L V IY1 AX L ER
+bilabial B AY0 L EY1 B IY0 AX L
+velar V IY1 L ER
+uvula Y UW1 V Y AX L AX
+pharynx F AE1 R IH0 NG K S
+trachea T R EY1 K IY0 AX
+incisors IH0 N S AY1 Z ER Z
+gums G AH1 M Z
+enamel IH0 N AE1 M AX L
+muscle M AH1 S AX L
+muscles M AH1 S AX L Z
+gentle JH EH1 N T AX L
+smooth S M UW1 DH
+smoothly S M UW1 DH L IY0
+crisp K R IH1 S P
+vivid V IH1 V IH0 D
+purely P Y UH1 R L IY0
+entirely IH0 N T AY1 R L IY0
+instantly IH1 N S T AX N T L IY0
+woman W UH1 M AX N
+women W IH1 M AX N
+man M AE1 N
+men M EH1 N
+child CH AY1 L D
+children CH IH1 L D R AX N
+button B AH1 T AX N
+buttons B AH1 T AX N Z
+click K L IH1 K
+challenge CH AE1 L AX N JH
+round R AW1 N D
+i'm AY1 M
+i've AY1 V
+i'll AY1 L
+i'd AY1 D
+you're Y UH1 R
+you've Y UW1 V
+you'll Y UW1 L
+you'd Y UW1 D
+he's HH IY1 Z
+she's SH IY1 Z
+it's IH1 T S
+we're W IH1 R
+we've W IY1 V
+we'll W IY1 L
+they're DH EH1 R
+they've DH EY1 V
+they'll DH EY1 L
+that's DH AE1 T S
+there's DH EH1 R Z
+here's HH IH1 R Z
+what's W AH1 T S
+who's HH UW1 Z
+how's HH AW1 Z
+where's W EH1 R Z
+let's L EH1 T S
+can't K AE1 N T
+won't W OW1 N T
+don't D OW1 N T
+doesn't D AH1 Z AX N T
+didn't D IH1 D AX N T
+isn't IH1 Z AX N T
+aren't AA1 R N T
+wasn't W AA1 Z AX N T
+weren't W ER1 N T
+haven't HH AE1 V AX N T
+hasn't HH AE1 Z AX N T
+hadn't HH AE1 D AX N T
+wouldn't W UH1 D AX N T
+couldn't K UH1 D AX N T
+shouldn't SH UH1 D AX N T

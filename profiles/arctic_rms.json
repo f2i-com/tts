@@ -1,0 +1,22 @@
+{
+  "gender": "male",
+  "pitchHz": 92.42,
+  "tractLengthCm": 18.95,
+  "speed": 1.02,
+  "expressiveness": 1.02,
+  "tone": [
+    10.0,
+    9.8,
+    2.8,
+    -1.9,
+    0.1,
+    -1.7,
+    -1.2,
+    6.8,
+    8.9,
+    7.2
+  ],
+  "openQuotient": 0.7,
+  "warmth": 0.15,
+  "breathiness": 0.2
+}

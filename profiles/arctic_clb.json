@@ -1,0 +1,28 @@
+{
+  "gender": "female",
+  "pitchHz": 184.5,
+  "tractLengthCm": 15.4,
+  "speed": 0.93,
+  "expressiveness": 0.94,
+  "warmth": 0.66,
+  "openQuotient": 0.69,
+  "tone": [
+    3.8,
+    3.7,
+    1.2,
+    -1.4,
+    0.7,
+    -1.5,
+    -1.5,
+    2.8,
+    2.6,
+    2.2
+  ],
+  "formants": [
+    1.0,
+    1.0,
+    1.0,
+    1.03,
+    1.03
+  ]
+}

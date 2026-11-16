@@ -1,0 +1,13 @@
+{
+  "name": "tts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "TTS (tts.computer): self-contained physical vocal-tract speech & singing synthesizer in Rust/WASM.",
+  "scripts": {
+    "build": "node tools/build_wasm.mjs",
+    "test": "cargo test --release && node tests/smoke.mjs",
+    "eval": "python tools/eval.py score --tag current",
+    "demo": "node demo/serve.mjs"
+  }
+}
