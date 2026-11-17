@@ -726,6 +726,9 @@ fn try_parse_bracket_tag(
             "vibrato" | "vib" => {
                 test_cfg.vibrato = apply_numeric_mod(test_cfg.vibrato, v, false).ok_or(())?;
             }
+            "creak" | "fry" | "vocalfry" | "vocal_fry" => {
+                test_cfg.creak = apply_numeric_mod(test_cfg.creak, v, false).ok_or(())?;
+            }
             "volume" | "gain" | "vol" | "level" => {
                 test_cfg.volume = apply_numeric_mod(test_cfg.volume, v, false).ok_or(())?;
             }
@@ -1246,6 +1249,7 @@ pub fn synthesize_cues(
                     continue;
                 }
                 let mut renderer = Renderer::new(frs_in, &voice);
+                renderer.set_bright_source();
                 let n_f = renderer.frames().len();
                 let mut pcm = vec![0.0f32; n_f * SAMPLES_PER_FRAME];
                 renderer.render(n_f, &mut pcm);

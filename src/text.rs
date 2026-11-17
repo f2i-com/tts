@@ -193,6 +193,75 @@ fn spell_letters(lower: &str) -> String {
         .join(" ")
 }
 
+/// A telephone number written in groups of digits at `start`: "0412 345 678", "02 9876 5432",
+/// "1800 123 456", "(02) 9876 5432". The groups (two to five digits each, at least eight in
+/// all, the first starting with 0 or 1, separated by single spaces or hyphens) and where the
+/// number ends.
+fn phone_groups(chars: &[char], start: usize) -> Option<(Vec<String>, usize)> {
+    let n = chars.len();
+    let mut k = start;
+    let bracketed = chars.get(k) == Some(&'(');
+    if bracketed {
+        k += 1;
+    }
+    let first_digit = *chars.get(k)?;
+    if !matches!(first_digit, '0' | '1') {
+        return None;
+    }
+    let mut groups: Vec<String> = Vec::new();
+    loop {
+        let s = k;
+        while k < n && chars[k].is_ascii_digit() {
+            k += 1;
+        }
+        let len = k - s;
+        if !(2..=5).contains(&len) {
+            return None;
+        }
+        groups.push(chars[s..k].iter().collect());
+        if bracketed && groups.len() == 1 {
+            if chars.get(k) != Some(&')') {
+                return None;
+            }
+            k += 1;
+        }
+        // another group: one space or hyphen, then a digit
+        if k + 1 < n && matches!(chars[k], ' ' | '-') && chars[k + 1].is_ascii_digit() {
+            k += 1;
+            continue;
+        }
+        break;
+    }
+    let digits: usize = groups.iter().map(|g| g.len()).sum();
+    let ends = chars.get(k).is_none_or(|c| !c.is_ascii_alphanumeric());
+    (groups.len() >= 2 && (8..=12).contains(&digits) && ends).then_some((groups, k))
+}
+
+/// The groups of an international number after its "+": "61 412 345 678".
+fn international_number(chars: &[char], start: usize) -> Option<(Vec<String>, usize)> {
+    let n = chars.len();
+    let mut k = start;
+    let mut groups: Vec<String> = Vec::new();
+    loop {
+        let s = k;
+        while k < n && chars[k].is_ascii_digit() {
+            k += 1;
+        }
+        if !(1..=4).contains(&(k - s)) {
+            return None;
+        }
+        groups.push(chars[s..k].iter().collect());
+        if k + 1 < n && matches!(chars[k], ' ' | '-') && chars[k + 1].is_ascii_digit() {
+            k += 1;
+            continue;
+        }
+        break;
+    }
+    let digits: usize = groups.iter().map(|g| g.len()).sum();
+    let ends = chars.get(k).is_none_or(|c| !c.is_ascii_alphanumeric());
+    (groups.len() >= 3 && (9..=14).contains(&digits) && ends).then_some((groups, k))
+}
+
 /// "am", "pm", "a.m" or "p.m" at `k`, not running on into a longer word: whether it is
 /// pm, and its length.
 fn meridiem_at(chars: &[char], k: usize) -> Option<(bool, usize)> {
@@ -574,7 +643,8 @@ pub fn normalize(raw: &str, lex: &Lexicon) -> String {
             if e1 - i <= 2 && e1 < n && chars[e1] == ':' {
                 let e2 = digits_from(e1 + 1);
                 let (hour, minute): (u64, u64) = (text(i, e1).parse().unwrap_or(99), text(e1 + 1, e2).parse().unwrap_or(99));
-                if e2 - e1 == 3 && hour < 24 && minute < 60 && after_ok(e2) {
+                // (the am / pm may follow at once: "3:30pm")
+                if e2 - e1 == 3 && hour < 24 && minute < 60 && (after_ok(e2) || meridiem_at(&chars, e2).is_some()) {
                     out.push_str(&cardinal(hour));
                     let mut k = e2;
                     while k < n && chars[k] == ' ' {
@@ -600,6 +670,34 @@ pub fn normalize(raw: &str, lex: &Lexicon) -> String {
                     }
                     continue;
                 }
+            }
+            // 17/11/2026, 11/17/2026, 3/4/26: a date. The day comes first where the first
+            // number cannot be a month; otherwise the month does, as in American English.
+            if e1 - i <= 2 && e1 < n && chars[e1] == '/' {
+                let e2 = digits_from(e1 + 1);
+                if e2 > e1 + 1 && e2 - e1 <= 3 && e2 < n && chars[e2] == '/' {
+                    let e3 = digits_from(e2 + 1);
+                    let year_len = e3 - e2 - 1;
+                    let (a, b): (u64, u64) = (text(i, e1).parse().unwrap_or(0), text(e1 + 1, e2).parse().unwrap_or(0));
+                    let (month, day) = if a > 12 { (b, a) } else { (a, b) };
+                    if (year_len == 2 || year_len == 4) && after_ok(e3) && (1..=12).contains(&month) && (1..=31).contains(&day) {
+                        out.push_str(MONTHS[month as usize - 1]);
+                        out.push(' ');
+                        out.push_str(&ordinal(day));
+                        out.push_str(", ");
+                        out.push_str(&integer_spoken(&text(e2 + 1, e3), true));
+                        i = e3;
+                        continue;
+                    }
+                }
+            }
+            // 0412 345 678, 02 9876 5432, 1800 123 456: a telephone number written in groups
+            // (one that starts with 0 or 1, at least eight digits in all) is read digit by digit
+            if let Some((groups, end)) = phone_groups(&chars, i) {
+                let spoken: Vec<String> = groups.iter().map(|g| digits_spoken(g)).collect();
+                out.push_str(&spoken.join(", "));
+                i = end;
+                continue;
             }
             // 1/2, 3/4, 5/8
             if e1 - i <= 2 && e1 < n && chars[e1] == '/' {
@@ -659,6 +757,24 @@ pub fn normalize(raw: &str, lex: &Lexicon) -> String {
                         i += 1;
                     }
                 }
+                continue;
+            }
+        }
+
+        // v1.2.0, V2.5: a version, read "version one point two point zero"
+        if matches!(c, 'v' | 'V') && before_ok && digit_at(i + 1) {
+            let mut k = digits_from(i + 1);
+            let mut parts = vec![chars[i + 1..k].iter().collect::<String>()];
+            while k + 1 < n && chars[k] == '.' && digit_at(k + 1) {
+                let e = digits_from(k + 1);
+                parts.push(chars[k + 1..e].iter().collect());
+                k = e;
+            }
+            if parts.len() >= 2 && !(k < n && chars[k].is_ascii_alphanumeric()) {
+                out.push_str("version ");
+                let spoken: Vec<String> = parts.iter().map(|p| integer_spoken(p, false)).collect();
+                out.push_str(&spoken.join(" point "));
+                i = k;
                 continue;
             }
         }
@@ -836,7 +952,17 @@ pub fn normalize(raw: &str, lex: &Lexicon) -> String {
         match c {
             '%' => out.push_str(" percent "),
             '&' => out.push_str(" and "),
-            '+' => out.push_str(" plus "),
+            '+' => {
+                // +61 412 345 678: a telephone number with its country code
+                if let Some((groups, end)) = phone_groups(&chars, i + 1).or_else(|| international_number(&chars, i + 1)) {
+                    let spoken: Vec<String> = groups.iter().map(|g| digits_spoken(g)).collect();
+                    out.push_str(" plus ");
+                    out.push_str(&spoken.join(", "));
+                    i = end;
+                    continue;
+                }
+                out.push_str(" plus ");
+            }
             '=' => out.push_str(" equals "),
             '@' => out.push_str(" at "),
             '#' if next_is_digit => out.push_str(" number "),
@@ -897,6 +1023,15 @@ pub fn normalize(raw: &str, lex: &Lexicon) -> String {
             {
                 out.push_str("minus ");
             }
+            // (02) 9876 5432: an area code in brackets starts a telephone number
+            '(' if phone_groups(&chars, i).is_some() => {
+                if let Some((groups, end)) = phone_groups(&chars, i) {
+                    let spoken: Vec<String> = groups.iter().map(|g| digits_spoken(g)).collect();
+                    out.push_str(&spoken.join(", "));
+                    i = end;
+                    continue;
+                }
+            }
             // Dashes, ellipses and brackets read as a short pause.
             '\u{2014}' | '\u{2013}' | '\u{2026}' | '(' | ')' | '[' | ']' => out.push_str(", "),
             // A line break ends the sentence unless punctuation already did.
@@ -931,7 +1066,15 @@ mod tests {
         assert_eq!(say("1½ hours"), "one and a half hours");
         assert_eq!(say("2 1/2 hours, 3 3/4 cups"), "two and a half hours, three and three quarters cups");
         assert_eq!(say("on 2026-11-16: done"), "on november sixteenth, twenty twenty six: done");
-        assert_eq!(say("on 16/11/2026"), "on sixteen/eleven/twenty twenty six");
+        assert_eq!(say("on 16/11/2026"), "on november sixteenth, twenty twenty six");
+        assert_eq!(say("on 11/16/2026 and 3/4/26"), "on november sixteenth, twenty twenty six and march fourth, twenty six");
+        assert_eq!(say("at 3:30pm or 10:45am."), "at three thirty pee em or ten forty five ay em.");
+        // telephone numbers in groups, digit by digit
+        assert_eq!(say("call 0412 345 678."), "call zero four one two, three four five, six seven eight.");
+        assert_eq!(say("or (02) 9876 5432 or +61 412 345 678"), "or zero two, nine eight seven six, five four three two or plus six one, four one two, three four five, six seven eight");
+        assert_eq!(say("in 2025 2026 we had 345 678 visitors"), "in twenty twenty five twenty twenty six we had three hundred forty five six hundred seventy eight visitors");
+        // versions
+        assert_eq!(say("TTS v1.2.0 is out"), "text to speech version one point two point zero is out");
         assert_eq!(say("at 10:30 PM, 9:05 or 7:00"), "at ten thirty pee em, nine oh five or seven o'clock");
         assert_eq!(say("at 10:30 AM or 9 am, 7:00 a.m. sharp"), "at ten thirty ay em or nine ay em, seven ay em sharp");
         assert_eq!(say("I am here at 7:00 amazing"), "I am here at seven o'clock amazing");

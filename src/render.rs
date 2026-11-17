@@ -23,8 +23,8 @@ use std::sync::{Arc, Mutex, OnceLock};
 pub const SAMPLE_RATE: u32 = 24_000;
 /// Samples per 5 ms control frame.
 pub const SAMPLES_PER_FRAME: usize = 120;
-/// Filter coefficients are refreshed 4 times per frame (every 1.25 ms).
-const SUBSTEP_SAMPLES: usize = 30;
+/// Filter coefficients are refreshed 8 times per frame (every 0.625 ms).
+const SUBSTEP_SAMPLES: usize = 15;
 
 /// Q of the plain second-order high-passes: 1/sqrt(2) as it was first typed in, kept to
 /// the digit because every coefficient - and so the sound - hangs on it.
@@ -35,7 +35,7 @@ const UG_SIZE: usize = 4096;
 /// (see where the renderer applies them). Sung frames are made wider by the same factors, so
 /// that singing keeps the resonances it was tuned with.
 pub(crate) fn formant_sharpness(female: bool) -> (f64, f64) {
-    (crate::tune("bw2", if female { 1.0 } else { 0.7 }), crate::tune("bw3", if female { 0.6 } else { 0.55 }))
+    (crate::tune("bw2", if female { 0.82 } else { 0.7 }), crate::tune("bw3", if female { 0.6 } else { 0.55 }))
 }
 
 /// Level of the voice bar (voicing heard through a closed mouth), about 17 dB below vowels.
@@ -96,7 +96,10 @@ impl PulseRow {
         self.tables[index].get_or_init(|| {
             let mut eg_modal = vec![0.0f32; UG_SIZE];
             let mut ug_env = vec![0.0f32; UG_SIZE];
-            build_solved_lf_tables(&mut eg_modal, Some(&mut ug_env), 0.43, OQ_MIN + index as f64 * 0.01, closure_return(self.closure));
+            let te = OQ_MIN + index as f64 * 0.01;
+            let tp_r = crate::tune("tp_ratio", 0.68);
+            let tp = if tp_r > 0.5 { tp_r * te } else { 0.43 };
+            build_solved_lf_tables(&mut eg_modal, Some(&mut ug_env), tp, te, closure_return(self.closure));
             ModalTable { eg_modal: mip_chain(&eg_modal), ug_env }
         })
     }
@@ -279,7 +282,7 @@ fn build_solved_lf_tables(deriv: &mut [f32], mut flow: Option<&mut [f32]>, tp: f
     }
 
     // Raised-cosine smoothing over ±16 table points (~0.4% of the period).
-    let k_rad: i32 = 16;
+    let k_rad: i32 = (crate::tune("k_rad", 16.0).round() as i32).clamp(2, 96);
     let mut smooth = vec![0.0f32; UG_SIZE];
     for (i, out) in smooth.iter_mut().enumerate() {
         let mut acc = 0.0f64;
@@ -304,10 +307,21 @@ fn build_solved_lf_tables(deriv: &mut [f32], mut flow: Option<&mut [f32]>, tp: f
         *d = (*d as f64 * inv_rms) as f32;
     }
 
-    if let Some(f) = flow {
+    if let Some(f) = flow.as_deref_mut() {
         let inv_max = 1.0 / max_flow;
         for v in f.iter_mut() {
             *v = (*v as f64 * inv_max) as f32;
+        }
+    }
+
+    // Optional closure-instant alignment to a safe late point (e.g. u = 0.78) that never wraps
+    // the open phase across u = 0, eliminating modal/warm/lax comb cancellation.
+    let gci_lock = crate::tune("gci_lock", 0.78);
+    if gci_lock > 0.5 && te < gci_lock {
+        let right = (((gci_lock - te) * UG_SIZE as f64).round() as usize) & UG_MASK;
+        deriv.rotate_right(right);
+        if let Some(f) = flow {
+            f.rotate_right(right);
         }
     }
 }
@@ -321,8 +335,23 @@ fn glottal_tables() -> &'static GlottalTables {
 
         // Warm conversational closure / soft breathy closure (the clear modal pulse depends
         // on the voice: see `modal_table`).
-        build_solved_lf_tables(&mut eg_warm, Some(&mut warm_flow), 0.46, 0.64, crate::tune("warm_return", 0.044));
-        build_solved_lf_tables(&mut eg_lax, None, 0.49, 0.71, 0.075);
+        let tp_r = crate::tune("tp_ratio", 0.68);
+        let warm_te = crate::tune("warm_te", 0.64);
+        let lax_te = crate::tune("lax_te", 0.71);
+        build_solved_lf_tables(
+            &mut eg_warm,
+            Some(&mut warm_flow),
+            if tp_r > 0.5 { (tp_r + 0.02).min(0.88) * warm_te } else { 0.46 },
+            warm_te,
+            crate::tune("warm_return", 0.044),
+        );
+        build_solved_lf_tables(
+            &mut eg_lax,
+            None,
+            if tp_r > 0.5 { (tp_r + 0.03).min(0.89) * lax_te } else { 0.49 },
+            lax_te,
+            crate::tune("lax_return", 0.075),
+        );
 
         // Demeaned, RMS-normalized flow pulse that drives the chest resonator.
         let mean_body = warm_flow.iter().map(|&v| v as f64).sum::<f64>() / UG_SIZE as f64;
@@ -391,6 +420,8 @@ struct Room {
     taps: &'static [(u16, f32)],
     pos: usize,
     wet: f64,
+    damp: f64,
+    lp: f64,
     first: f64,
     second_half: bool,
     prev: f64,
@@ -407,6 +438,8 @@ impl Room {
             taps: room_taps(),
             pos: 0,
             wet: amount * 2.0 * 10f64.powf(-18.0 / 20.0),
+            damp: crate::tune("room_damp", 0.0),
+            lp: 0.0,
             first: 0.0,
             second_half: false,
             prev: 0.0,
@@ -424,7 +457,14 @@ impl Room {
         }
         self.second_half = false;
         self.pos = (self.pos + 1) & (ROOM_LEN - 1);
-        self.buf[self.pos] = ((self.first + x) * 0.5) as f32;
+        let x_half = (self.first + x) * 0.5;
+        let x_in = if self.damp > 0.0 {
+            self.lp += self.damp * (x_half - self.lp);
+            self.lp
+        } else {
+            x_half
+        };
+        self.buf[self.pos] = x_in as f32;
         let mut tail = 0.0f32;
         // (the masked index of a fixed-size buffer needs no bounds check: this loop is half
         // of the renderer's time)
@@ -444,13 +484,16 @@ impl Room {
 struct State {
     glot_phase: f64,
     sub_harm_toggle: f64,
-    /// This glottal cycle's own deviation in length and in strength (drawn anew every cycle).
+    /// This glottal cycle's own deviation in length, strength, and pulse warmth (drawn anew every cycle).
     cyc_jit: f64,
     cyc_shim: f64,
+    cyc_shape: f64,
     /// Memory of the closing-edge shelf on the voiced source (x1, x2, y1, y2).
     edge: [f64; 4],
-    /// One-pole spectral tilt state on the voiced glottal source.
+    /// One-pole/one-zero spectral tilt state on the voiced glottal source, plus smoothed cycle gain.
+    tilt_x: f64,
     tilt_y: f64,
+    cur_cyc_gain: f64,
     /// The simulated folds (the `folds` setting) and the running mean of their flow.
     fold: Voicing,
     fold_flow_mean: f64,
@@ -522,9 +565,9 @@ struct State {
     hnm_lp: f64,
     prev_par_in: f64,
     prev_oral: f64,
-    room_idx: usize,
     eq_z1: [f64; TONE_BANDS],
     eq_z2: [f64; TONE_BANDS],
+    ap_z: [f64; 8],
     /// Whether the previous frame was a stop burst (to find the instant of release).
     prev_burst: bool,
     /// Which pulse of the open-quotient bank the current glottal cycle uses.
@@ -545,8 +588,11 @@ impl State {
             sub_harm_toggle: 1.0,
             cyc_jit: 0.0,
             cyc_shim: 0.0,
+            cyc_shape: 0.0,
             edge: [0.0; 4],
+            tilt_x: 0.0,
             tilt_y: 0.0,
+            cur_cyc_gain: 1.0,
             fold: Voicing::default(),
             fold_flow_mean: 0.0,
             flt_phase1: 0.0,
@@ -612,9 +658,9 @@ impl State {
             hnm_lp: 0.0,
             prev_par_in: 0.0,
             prev_oral: 0.0,
-            room_idx: 0,
             eq_z1: [0.0; TONE_BANDS],
             eq_z2: [0.0; TONE_BANDS],
+            ap_z: [0.0; 8],
             prev_burst: false,
             oq_idx: 16,
             tr_x1: 0.0,
@@ -702,7 +748,7 @@ fn larynx_for(cfg: &VoiceConfig) -> Arc<Larynx> {
         peel: crate::tune("fold_peel", peel),
         leak: crate::tune("fold_leak", if female { 6.0e-6 } else { 4.2e-6 }) * clamp(cfg.breathiness, 0.0, 0.85),
     };
-    let pitch = clamp(cfg.pitch_hz, 60.0, 350.0);
+    let pitch = clamp(cfg.pitch_hz * if female { 1.0 } else { 0.94 }, 60.0, 350.0);
     let mut recent = RECENT.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(i) = recent.iter().position(|(d, g, f, _)| *d == usual && *g == cfg.gender && *f == pitch.to_bits()) {
         let entry = recent.remove(i);
@@ -829,10 +875,11 @@ pub struct Renderer {
     out_gain: f64,
     /// Scale of the per-frame loudness written back into the frames (see `set_energy_scale`).
     energy_scale: f64,
+    /// Whether the man's voice gets the speech source tilt (off for vocal sounds).
+    speech_tilt: bool,
     /// Tone equalizer for the voiced sound; `None` when the curve is flat.
     tone_eq: Option<[[f64; 5]; TONE_BANDS]>,
     st: State,
-    room_buf: [f32; 512],
     room: Room,
     room_on: bool,
     silent_tail: Frame,
@@ -907,15 +954,19 @@ impl Renderer {
         // is what gives a real voice its "presence"); measured against a real speaker this
         // cut the mismatch of the voiced spectrum from 8 dB to 3 dB. Women's upper formants
         // are spread wider and the third one falls above the band that matters.
-        let f4_base = clamp(3460.0 * (1.0 + (formant_scale - 1.0) * 0.78) * cfg.formants[3], 2600.0, 4950.0);
+        let f4_base = clamp(
+            if female { 3960.0 } else { 3451.0 } * (1.0 + (formant_scale - 1.0) * 0.78) * cfg.formants[3],
+            2600.0,
+            5150.0,
+        );
         let b4_hz = if female { 310.0 } else { 200.0 } * formant_scale;
         let f5_hz = clamp(
-            if female { 4420.0 } else { 3950.0 } * (1.0 + (formant_scale - 1.0) * 0.72) * cfg.formants[4],
+            if female { 5060.0 } else { 3941.0 } * (1.0 + (formant_scale - 1.0) * 0.72) * cfg.formants[4],
             3450.0,
-            6200.0,
+            6400.0,
         );
         let b5_hz = if female { 450.0 } else { 260.0 } * formant_scale;
-        let f6_hz = if female { 0.0 } else { 4500.0 } * (1.0 + (formant_scale - 1.0) * 0.72) * cfg.formants[4];
+        let f6_hz = if female { 0.0 } else { 4489.0 } * (1.0 + (formant_scale - 1.0) * 0.72) * cfg.formants[4];
         let r6 = (-PI * 380.0 * formant_scale * inv_fs).exp();
         let b6c = 2.0 * r6 * (TAU * f6_hz * inv_fs).cos();
         let c6c = -r6 * r6;
@@ -951,12 +1002,12 @@ impl Renderer {
         let upper_gain = crate::tune("air_gain", if female { 0.3 } else { 0.2 }) * air * air;
         // Above about 7 kHz a voice is breath noise, not harmonics (tools/harmonicity.py):
         // a shelf of noise that follows the voicing, heard past the tract.
-        let top_gain = crate::tune("top_gain", if female { 0.02 } else { 0.008 }) * air * air;
+        let top_gain = crate::tune("top_gain", if female { 0.006 } else { 0.003 }) * air * air;
         let top_hp = high_pass(TAU * crate::tune("top_cut", if female { 9500.0 } else { 7500.0 }) * inv_fs, HIGH_PASS_Q);
         // (eighth order: what leaks through below the cut-off would add to, or cancel, the
         // formants there)
         let upper_hp: [(f64, f64, f64); 4] = {
-            let w0 = TAU * 5200.0 * inv_fs;
+            let w0 = TAU * crate::tune("upper_cut", 4400.0) * inv_fs;
             [0.5098, 0.6013, 0.9000, 2.5629].map(|q| high_pass(w0, q))
         };
 
@@ -972,7 +1023,7 @@ impl Renderer {
             5600.0,
         );
         let cos_pir = (TAU * f_pir_hz * inv_fs).cos();
-        let r_pir_z = crate::tune("pir_z", 0.91);
+        let r_pir_z = crate::tune("pir_z", 0.86);
         let r_pir_p = 0.79;
         let pir_b1 = -2.0 * r_pir_z * cos_pir;
         let pir_b2 = r_pir_z * r_pir_z;
@@ -984,7 +1035,7 @@ impl Renderer {
         // (This and the notch above leave the vowels 6-20 dB short of two 24 kHz reference
         // voices between 3.3 and 6 kHz. Opening them up matched the references and scored
         // lower: the synthesizer's own top end is noise where a voice has harmonics.)
-        let muc_cut_hz = crate::tune("muc_cut", if female { 5150.0 } else { 4850.0 });
+        let muc_cut_hz = crate::tune("muc_cut", if female { 5750.0 } else { 5650.0 });
         let muc_pole = (-TAU * muc_cut_hz * inv_fs).exp();
         let muc_gain = 1.0 - muc_pole;
 
@@ -1038,8 +1089,8 @@ impl Renderer {
             // harmonic razor-sharp. The female voice has none: its harmonics already stand
             // no further above the noise between them than a real voice's
             // (tools/harmonicity.py), and there the variation only cost clarity.
-            cyc_jit_sd: crate::tune("cyc_jit", if female { 0.0 } else { 0.004 }),
-            cyc_shim_sd: crate::tune("cyc_shim", if female { 0.0 } else { 0.03 }),
+            cyc_jit_sd: crate::tune("cyc_jit", 0.0),
+            cyc_shim_sd: crate::tune("cyc_shim", 0.0),
             larynx: cfg.folds.then(|| larynx_for(cfg)),
             edge: {
                 // The closing edge of a real pulse is sharper than its return phase alone
@@ -1084,8 +1135,16 @@ impl Renderer {
             warmth,
             // Breath noise that leaks through the glottis on every cycle; a voice without
             // it sounds like a buzzer.
-            hnm_air_gain: if female { 0.11 } else { 0.15 } + breathiness * 0.22,
-            oq_base: clamp(cfg.open_quotient, 0.5, 0.74),
+            hnm_air_gain: if female { 0.11 } else { 0.15 }
+                + breathiness * 0.22
+                + crate::tune("breathy_hnm", 0.75) * crate::config::breathy_excess(breathiness),
+            // (a breathy man's voice holds the glottis open for longer; in a woman's that
+            // only cost naturalness, on top of what her higher open quotient already gives)
+            oq_base: clamp(
+                cfg.open_quotient + crate::tune("breathy_oq", if female { 0.0 } else { 0.05 }) * crate::config::breathy_excess(breathiness),
+                0.5,
+                0.8,
+            ),
             pitch_oq: 0.015 * clamp(cfg.pitch_coupling, 0.0, 1.0),
             subglottal: clamp(cfg.subglottal, 0.0, 1.0),
             // (the male factor was 0.22: that put the fundamental 6 dB above the second
@@ -1100,8 +1159,22 @@ impl Renderer {
             // settings; the whole is brought up so that both sources come out equally loud)
             out_gain: if female { 0.20 } else { 0.19 } * if cfg.folds { crate::tune("fold_level", 1.2) } else { 1.0 },
             energy_scale: 1.0,
+            speech_tilt: true,
             tone_eq: {
-                let tone = cfg.effective_tone();
+                let mut tone = cfg.effective_tone();
+                let nat_eq = crate::tune("nat_eq", 1.0);
+                if nat_eq != 0.0 {
+                    // Per-gender voiced-path spectral calibration compensating cascade F1-skirt
+                    // excess (1-2.2 kHz) and matching natural chest warmth and upper presence.
+                    const MALE_BASE_EQ: [f64; TONE_BANDS] =
+                        [4.02, 2.27, 0.28, -1.79, -2.35, -1.32, -0.27, -0.19, -0.59, -1.08];
+                    const FEMALE_BASE_EQ: [f64; TONE_BANDS] =
+                        [0.15, 1.80, 1.14, -1.31, -2.04, -0.60, 1.48, 1.86, 2.38, 3.17];
+                    let base = if female { &FEMALE_BASE_EQ } else { &MALE_BASE_EQ };
+                    for (t, &b) in tone.iter_mut().zip(base.iter()) {
+                        *t += b * nat_eq;
+                    }
+                }
                 if tone.iter().any(|g| g.abs() > 0.05) {
                     let mut bands = [[1.0, 0.0, 0.0, 0.0, 0.0]; TONE_BANDS];
                     for (i, band) in bands.iter_mut().enumerate() {
@@ -1117,7 +1190,6 @@ impl Renderer {
                 st.oq_idx = oq_index(clamp(cfg.open_quotient, 0.5, 0.74));
                 st
             },
-            room_buf: [0.0; 512],
             room: Room::new(clamp(cfg.room, 0.0, 1.0)),
             room_on: cfg.room > 0.001,
             silent_tail: silent_tail_frame(base_ref_f0),
@@ -1175,9 +1247,9 @@ impl Renderer {
         // longer tract: with them the upper formants stand out of the spectrum as far as a
         // real voice's do (the measure is tools/eval.py; a narrower first one only hurts).
         let (bw2, bw3) = formant_sharpness(self.is_female);
-        let asp_a1 = crate::tune("asp_a1", 0.78);
-        let asp_a2 = crate::tune("asp_a2", 0.68);
-        let asp_gain = crate::tune("asp_gain", 2.35);
+        let asp_a1 = crate::tune("asp_a1", 0.62);
+        let asp_a2 = crate::tune("asp_a2", 0.52);
+        let asp_gain = crate::tune("asp_gain", 1.85);
         let asp_hf = crate::tune("asp_hf", 0.0);
         let par_tap = self.presence_tap;
         let pulses = self.pulses.clone();
@@ -1195,17 +1267,64 @@ impl Renderer {
         let fold_preroll = crate::tune("fold_preroll", 0.02);
         let fold_chest = crate::tune("fold_chest", if self.is_female { 4.4 } else { 6.9 });
         let fold_lax_quiet = crate::tune("fold_lax_quiet", 0.1);
-        let creak_am = crate::tune("creak_am", 0.6);
-        let creak_fm = crate::tune("creak_fm", 0.2);
+        let creak_am = crate::tune("creak_am", 0.44);
+        let creak_fm = crate::tune("creak_fm", 0.14);
         let burst_sharp = crate::tune("burst_sharp", 6.0);
-        let transient = crate::tune("transient", 6.0);
-        // One-pole glottal spectral tilt on the female pulse source, softening excess 1.5-3.5 kHz
-        // cascade energy induced by higher female open-vowel F1 resonances.
+        let transient = crate::tune("transient", 4.0);
+        let m_fric_nsib = crate::tune("m_fric_nsib", 1.0);
+        let m_fric_sib = crate::tune("m_fric_sib", 1.0);
+        let air_after_muc = crate::tune("air_after_muc", 0.35);
+        // One-pole spectral tilt on the pulse source. The woman's is gentle, softening excess
+        // 1.5-3.5 kHz cascade energy from her higher open-vowel F1 resonances. The man's falls
+        // away above about 850 Hz: measured vowel by vowel, his second formant stood 10 dB
+        // further above the first than his reader's (the source is the flow's derivative and the
+        // lips differentiate again, which lifts the top 6 dB an octave); with this his vowels
+        // move toward the reader's balance, and both judges agree on nine sets of sentences.
+        // (The woman's voice is marked down by the predictor with any such tilt.)
         let glot_tilt = if self.is_female {
             crate::tune("glot_tilt", 0.22)
+        } else if self.speech_tilt {
+            crate::tune("glot_tilt_m", 0.77)
         } else {
-            crate::tune("glot_tilt_m", 0.04)
+            0.04
         };
+        let glot_shelf_z = if self.is_female {
+            crate::tune("glot_zero_f", 0.0)
+        } else if self.speech_tilt {
+            crate::tune("glot_zero_m", 0.42)
+        } else {
+            0.0
+        };
+        let hnm_scale = crate::tune(if self.is_female { "hnm_f" } else { "hnm_m" }, if self.is_female { 1.0 } else { 0.82 });
+        let hnm_lp_a = crate::tune("hnm_lp_a", 0.44);
+        let flutter_scale = crate::tune("flutter", 0.28);
+        let oq_mod_scale = crate::tune("oq_mod", 1.0);
+        let effort_tilt = crate::tune("effort_tilt", if self.is_female { 0.015 } else { 0.0 });
+        let cyc_shape_sd = crate::tune("cyc_shape", 0.02);
+        let seal_lp = crate::tune("seal_lp", 1.0);
+        let fric_mix = crate::tune(
+            "fric_mix",
+            if self.is_female {
+                crate::tune("fric_mix_f", 1.08)
+            } else {
+                crate::tune("fric_mix_m", 1.22)
+            },
+        );
+        let mk_ap = |f_hz: f64, q: f64| {
+            let w0 = TAU * f_hz * inv_fs;
+            let alpha = w0.sin() / (2.0 * q);
+            let a0 = 1.0 + alpha;
+            ((1.0 - alpha) / a0, -2.0 * w0.cos() / a0)
+        };
+        // 4-section causal voiced-path phase dispersion (~1 ms round-trip vocal-tract group delay),
+        // relaxing zero-phase wavetable peakiness while leaving fricative/burst transients untouched.
+        let ap_voiced: Option<[(f64, f64); 4]> = (crate::tune("ap_disp", 1.0) > 0.5).then(|| {
+            if self.is_female {
+                [mk_ap(898.0, 2.156), mk_ap(2224.0, 2.153), mk_ap(2343.7, 2.105), mk_ap(2843.1, 2.225)]
+            } else {
+                [mk_ap(584.5, 1.484), mk_ap(1230.9, 0.719), mk_ap(1694.2, 2.350), mk_ap(3621.3, 2.476)]
+            }
+        });
         // The `subglottal` setting: while the glottis is open the windpipe is part of the
         // tube, and its second resonance (about 1.4 kHz in a man, 1.6 kHz in a woman) puts a
         // dip and a small peak into the spectrum.
@@ -1277,18 +1396,28 @@ impl Renderer {
 
             let burst_onset = f_cur.is_burst && !s.prev_burst;
             s.prev_burst = f_cur.is_burst;
-            let mut release_click = if burst_onset { transient * f_cur.af.max(f_next.af) } else { 0.0 };
+            let is_sib = matches!(f_cur.phone, Ph::S | Ph::Z | Ph::SH | Ph::ZH | Ph::CH | Ph::JH);
+            let fric_voice_scale = if self.speech_tilt && larynx.is_none() && !is_female {
+                if is_sib { m_fric_sib } else { m_fric_nsib }
+            } else {
+                1.0
+            };
+            let click_place = if matches!(f_cur.phone, Ph::P | Ph::B) { crate::tune("pb_click", 1.0) } else { 1.0 };
+            let mut release_click = if burst_onset { transient * click_place * f_cur.af.max(f_next.af) } else { 0.0 };
             let into_burst = f_next.is_burst && !f_cur.is_burst;
             let room_quiet = !room_on || self.room.level * self.room.wet < 2e-6;
+            let voice_off = f_cur.av < 0.0004 && f_next.av < 0.0004 && f_cur.avb < 0.0004 && f_next.avb < 0.0004;
+            if voice_off {
+                // Start the next voiced stretch from the quiet open onset (u = 0) even if the
+                // room tail is still dying away across a pause or voiceless consonant.
+                s.glot_phase = 0.0;
+            }
             let is_silent_frame = room_quiet
-                && f_cur.av < 0.0004
-                && f_next.av < 0.0004
+                && voice_off
                 && f_cur.ah < 0.0004
                 && f_next.ah < 0.0004
                 && f_cur.af < 0.0004
                 && f_next.af < 0.0004
-                && f_cur.avb < 0.0004
-                && f_next.avb < 0.0004
                 && f_cur.tone < 0.0004
                 && f_next.tone < 0.0004
                 && s.y1_1.abs() < 0.0001
@@ -1307,18 +1436,6 @@ impl Renderer {
                 continue;
             }
 
-            // F4 follows tongue frontness and pitch slightly.
-            let f4_dyn = clamp(
-                f4_base
-                    * (1.0
-                        + 0.035 * ((f_cur.f2 - 1450.0) * 0.001)
-                        + 0.020 * ((f_cur.f0 - base_ref_f0) / base_ref_f0)),
-                2550.0,
-                5050.0,
-            );
-            let b4c = 2.0 * r4 * (TAU * f4_dyn * inv_fs).cos();
-            let a4c = 1.0 - b4c - c4c;
-
             let cur_stress = f_cur.stress;
             let (cur_fric_g1, cur_fric_g2) = (f_cur.fric_g1, f_cur.fric_g2);
             let mut frame_sq_sum = 0.0f64;
@@ -1330,6 +1447,17 @@ impl Renderer {
                 let f1 = lerp(f_cur.f1, f_next.f1);
                 let mut f2 = lerp(f_cur.f2, f_next.f2);
                 let mut f3 = lerp(f_cur.f3, f_next.f3);
+                // F4 follows tongue frontness and pitch smoothly at substep rate.
+                let f4_dyn = clamp(
+                    f4_base
+                        * (1.0
+                            + 0.035 * ((f2 - 1450.0) * 0.001)
+                            + 0.020 * ((f0 - base_ref_f0) / base_ref_f0)),
+                    2550.0,
+                    5050.0,
+                );
+                let b4c = 2.0 * r4 * (TAU * f4_dyn * inv_fs).cos();
+                let a4c = 1.0 - b4c - c4c;
                 let mut b1 = lerp(f_cur.b1, f_next.b1);
                 let b2 = lerp(f_cur.b2, f_next.b2) * bw2;
                 let b3 = lerp(f_cur.b3, f_next.b3) * bw3;
@@ -1464,14 +1592,15 @@ impl Renderer {
                     s.vib_phase -= 1.0;
                 }
 
-                let flutter = 0.0052 * (TAU * s.flt_phase1).sin()
+                let flutter = (0.0052 * (TAU * s.flt_phase1).sin()
                     + 0.0034 * (TAU * s.flt_phase2).sin()
-                    + 0.0020 * (TAU * s.flt_phase3).sin();
+                    + 0.0020 * (TAU * s.flt_phase3).sin())
+                    * flutter_scale;
                 let vib_mod = vibrato_depth * (TAU * s.vib_phase).sin();
                 s.rng = xorshift(s.rng);
                 let r_norm = (s.rng & 0x7fff_ffff) as f64 * 4.65661287e-10 - 0.5;
-                s.jitter_walk = s.jitter_walk * 0.90 + r_norm * (0.0035 + roughness * 0.032);
-                s.shimmer_walk = s.shimmer_walk * 0.90 + r_norm * (0.015 + roughness * 0.14);
+                s.jitter_walk = s.jitter_walk * 0.9487 + r_norm * 0.7071 * (0.0035 + roughness * 0.032);
+                s.shimmer_walk = s.shimmer_walk * 0.9487 + r_norm * 0.7071 * (0.015 + roughness * 0.14);
 
                 let inst_f0 = clamp(f0 * (1.0 + flutter + vib_mod + s.jitter_walk), 50.0, 980.0);
                 let phase_inc = inst_f0 * inv_fs;
@@ -1490,21 +1619,23 @@ impl Renderer {
                 let eg_lax = &tables.eg_lax[level * UG_SIZE..(level + 1) * UG_SIZE];
 
                 // Open-quotient blend: modal <-> warm <-> lax, breathing slowly at 4–7 Hz.
-                let oq_mod = 0.08 * (TAU * s.flt_phase1).sin() + 0.05 * (TAU * s.flt_phase2).sin();
+                let oq_mod = (0.08 * (TAU * s.flt_phase1).sin() + 0.05 * (TAU * s.flt_phase2).sin()) * oq_mod_scale;
                 // The voice box: raising the pitch stretches the folds thinner, so they stay
                 // open longer and close more gently (development hooks, per semitone above
                 // the voice's base pitch; see tools/voice_quality.py).
                 let pitch_st = clamp(12.0 * (f0 / base_ref_f0).log2(), -8.0, 8.0);
-                let lax_weight = clamp(lax + (1.0 - av) * 0.35 + pitch_lax * pitch_st, 0.0, 0.92);
+                let lax_weight = clamp(lax + (1.0 - av) * 0.35 + pitch_lax * pitch_st + 0.22 * seal_lp * oral_seal, 0.0, 0.92);
                 let rem_weight = 1.0 - lax_weight;
-                let warm_frac = clamp(
-                    warmth * if is_female { 0.76 } else { 0.64 }
-                        + if cur_stress == 1 { -0.08 } else { 0.09 } * stress_warm
-                        + pitch_warm * pitch_st
-                        + oq_mod,
-                    0.05,
-                    0.95,
-                );
+                let base_warm_frac = warmth * if is_female { 0.76 } else { 0.64 }
+                    + if cur_stress == 1 { -0.08 } else { 0.09 } * stress_warm
+                    + pitch_warm * pitch_st
+                    + oq_mod;
+                let dyn_glot_tilt = if glot_tilt > 0.0 || effort_tilt != 0.0 {
+                    clamp(glot_tilt - effort_tilt * pitch_st, 0.0, 0.93)
+                } else {
+                    0.0
+                };
+                let warm_frac = clamp(base_warm_frac, 0.05, 0.95);
                 let w_warm = rem_weight * warm_frac;
                 let w_modal = rem_weight * (1.0 - warm_frac);
 
@@ -1531,6 +1662,13 @@ impl Renderer {
                 let par2_gain = a2c * 0.085 * oral_open_factor * par_tap;
                 let par3_gain = a3c * 0.075 * oral_open_factor * par_tap;
                 let open_trach_damp = if is_female { 0.012 } else { 0.008 };
+                let air_open = 1.0 - (seal_lp * oral_seal).min(1.0);
+                let (cur_muc_p, cur_muc_g) = if seal_lp > 0.0 && oral_seal > 0.02 {
+                    let p = muc_pole + (0.58 - muc_pole) * (seal_lp * oral_seal).min(1.0);
+                    (p, 1.0 - p)
+                } else {
+                    (muc_pole, muc_gain)
+                };
 
                 let need_noise = ah > 0.0003 || av > 0.12 || has_fric;
 
@@ -1557,7 +1695,7 @@ impl Renderer {
                         if s.glot_phase >= 1.0 {
                             s.glot_phase -= 1.0;
                             s.sub_harm_toggle = -s.sub_harm_toggle;
-                            if cyc_jit_sd > 0.0 || cyc_shim_sd > 0.0 {
+                            if cyc_jit_sd > 0.0 || cyc_shim_sd > 0.0 || cyc_shape_sd > 0.0 {
                                 // (the sum of three uniform numbers is close enough to a bell curve)
                                 let mut draw = || {
                                     let mut g = 0.0;
@@ -1567,8 +1705,13 @@ impl Renderer {
                                     }
                                     g
                                 };
-                                s.cyc_jit = draw() * cyc_jit_sd;
-                                s.cyc_shim = draw() * cyc_shim_sd;
+                                if cyc_jit_sd > 0.0 || cyc_shim_sd > 0.0 {
+                                    s.cyc_jit = draw() * cyc_jit_sd;
+                                    s.cyc_shim = draw() * cyc_shim_sd;
+                                }
+                                if cyc_shape_sd > 0.0 {
+                                    s.cyc_shape = draw() * cyc_shape_sd;
+                                }
                             }
                             // A new cycle may open a little longer or shorter than the last one.
                             if s.oq_idx != oq_target {
@@ -1589,14 +1732,26 @@ impl Renderer {
                         let e_lx = eg_lax[idx0] as f64 + (eg_lax[idx1] as f64 - eg_lax[idx0] as f64) * frac;
                         flow_env = ug_env[idx0] as f64 + (ug_env[idx1] as f64 - ug_env[idx0] as f64) * frac;
 
-                        let creak_scale = 1.0 + s.sub_harm_toggle * (roughness * 0.28 + creak * creak_am);
-                        glot_excite = (e_mod * w_modal + e_wrm * w_warm + e_lx * lax_weight) * creak_scale;
-                        chest_in = ug_body[idx0] as f64 * av * creak_scale * 0.50;
+                        let sub_rough = (roughness - 0.14).max(0.0) * 0.34;
+                        let target_cyc_gain = (1.0 + s.sub_harm_toggle * (sub_rough + creak * creak_am)) * (1.0 + s.cyc_shim);
+                        s.cur_cyc_gain += (target_cyc_gain - s.cur_cyc_gain) * 0.08;
+                        let (wm, ww) = if cyc_shape_sd > 0.0 {
+                            let wf = clamp(base_warm_frac + s.cyc_shape, 0.03, 0.97);
+                            (rem_weight * (1.0 - wf), rem_weight * wf)
+                        } else {
+                            (w_modal, w_warm)
+                        };
+                        glot_excite = (e_mod * wm + e_wrm * ww + e_lx * lax_weight) * s.cur_cyc_gain;
+                        chest_in = ug_body[idx0] as f64 * av * s.cur_cyc_gain * 0.50;
                     }
-                    let mut voiced_src = glot_excite * voiced_gain * (1.0 + s.cyc_shim);
-                    if glot_tilt > 0.0 && larynx.is_none() {
-                        s.tilt_y = glot_tilt * s.tilt_y + (1.0 - glot_tilt) * voiced_src;
-                        voiced_src = s.tilt_y;
+                    let mut voiced_src = glot_excite * voiced_gain;
+                    if dyn_glot_tilt > 0.0 && larynx.is_none() {
+                        // Pole-zero source shelf: warms F2 while preserving upper-formant harmonics when glot_shelf_z > 0.
+                        let dc_norm = (1.0 - dyn_glot_tilt) / (1.0 - glot_shelf_z).max(0.05);
+                        let y = dyn_glot_tilt * s.tilt_y + dc_norm * (voiced_src - glot_shelf_z * s.tilt_x);
+                        s.tilt_x = voiced_src;
+                        s.tilt_y = y;
+                        voiced_src = y;
                     }
                     if let Some([b0, b1, b2, a1, a2]) = edge {
                         let y = b0 * voiced_src + b1 * s.edge[0] + b2 * s.edge[1] - a1 * s.edge[2] - a2 * s.edge[3];
@@ -1630,8 +1785,8 @@ impl Renderer {
                         if av > 0.12 {
                             let hi_air = white - s.hnm_prev * 0.84;
                             s.hnm_prev = white;
-                            s.hnm_lp = s.hnm_lp * 0.44 + hi_air * 0.56;
-                            hnm_src = s.hnm_lp * flow_env * av * hnm_air_gain;
+                            s.hnm_lp = s.hnm_lp * hnm_lp_a + hi_air * (1.0 - hnm_lp_a);
+                            hnm_src = s.hnm_lp * flow_env * av * hnm_air_gain * hnm_scale;
                         }
                     }
 
@@ -1706,6 +1861,7 @@ impl Renderer {
                         y5 = y6;
                     }
                     // Air: the resonances above F5/F6, and of those only the top band
+                    let mut air_bypass = 0.0;
                     if upper_n > 0 {
                         let mut y_up = y5;
                         for (k, &(a, b, c)) in upper[..upper_n].iter().enumerate() {
@@ -1723,7 +1879,8 @@ impl Renderer {
                             h[2] = y;
                             y_up = y;
                         }
-                        y5 += y_up * upper_gain;
+                        y5 += y_up * upper_gain * (1.0 - air_after_muc) * air_open;
+                        air_bypass = y_up * upper_gain * air_after_muc * air_open;
                     }
 
                     // Piriform-fossa notch (unity pass-band pole-zero pair)
@@ -1749,8 +1906,8 @@ impl Renderer {
                     s.p3_1 = yp3;
 
                     let oral_raw = oral_cascade + (yp2 - yp3);
-                    s.muc1 = muc_pole * s.muc1 + muc_gain * oral_raw;
-                    s.muc2 = muc_pole * s.muc2 + muc_gain * s.muc1;
+                    s.muc1 = cur_muc_p * s.muc1 + cur_muc_g * oral_raw;
+                    s.muc2 = cur_muc_p * s.muc2 + cur_muc_g * s.muc1;
 
                     // Chest body + voice bar
                     let y_ch = a_ch * chest_in + b_ch * s.ch1 + c_ch * s.ch2;
@@ -1783,7 +1940,7 @@ impl Renderer {
                         s.fr2_y2 = s.fr2_y1;
                         s.fr2_y1 = y_fr2;
 
-                        fric_out = (y_fr1 + y_fr2) * 2.10;
+                        fric_out = (y_fr1 + y_fr2) * 2.10 * fric_voice_scale;
                         if hp_on {
                             for k in 0..2 {
                                 let (x1, x2) = (s.hp_x[2 * k], s.hp_x[2 * k + 1]);
@@ -1809,7 +1966,7 @@ impl Renderer {
                     // Mix, a whisper of early room reflection, DC blocker, soft limiter
                     // Everything that came through the throat gets the voice's tone curve;
                     // noise made at the lips and teeth does not.
-                    let mut voiced_out = s.muc2 + y_ch * chest_mix + y_vb * VOICE_BAR_MIX;
+                    let mut voiced_out = s.muc2 + air_bypass + y_ch * chest_mix + y_vb * VOICE_BAR_MIX;
                     if let Some(bands) = &tone_eq {
                         for (k, c) in bands.iter().enumerate() {
                             let y = c[0] * voiced_out + s.eq_z1[k];
@@ -1818,7 +1975,15 @@ impl Renderer {
                             voiced_out = y;
                         }
                     }
-                    let mut dry = voiced_out + fric_out + asp_air + top_out;
+                    if let Some(secs) = &ap_voiced {
+                        for (k, &(b0, b1)) in secs.iter().enumerate() {
+                            let y = b0 * voiced_out + s.ap_z[2 * k];
+                            s.ap_z[2 * k] = b1 * (voiced_out - y) + s.ap_z[2 * k + 1];
+                            s.ap_z[2 * k + 1] = voiced_out - b0 * y;
+                            voiced_out = y;
+                        }
+                    }
+                    let mut dry = voiced_out + fric_mix * (fric_out + asp_air + top_out * air_open);
                     if tone > 0.0004 {
                         s.tone_phase += tone_inc;
                         if s.tone_phase >= 1.0 {
@@ -1830,11 +1995,7 @@ impl Renderer {
                         s.tone_drift += (n - s.tone_drift) * 0.0015;
                         dry += (TAU * s.tone_phase).sin() * tone * 1.6 * (1.0 + 2.5 * s.tone_drift);
                     }
-                    let r_tap1 = self.room_buf[s.room_idx.wrapping_sub(203) & 511] as f64;
-                    let r_tap2 = self.room_buf[s.room_idx.wrapping_sub(347) & 511] as f64;
-                    self.room_buf[s.room_idx] = dry as f32;
-                    s.room_idx = (s.room_idx + 1) & 511;
-                    let mut studio_sig = dry + r_tap1 * 0.044 - r_tap2 * 0.025;
+                    let mut studio_sig = dry;
                     if room_on {
                         studio_sig += self.room.process(studio_sig);
                     }
@@ -1875,6 +2036,13 @@ impl Renderer {
     /// does: it sets the scale beforehand, from a test render (1 / the loudest frame).
     pub fn set_energy_scale(&mut self, scale: f64) {
         self.energy_scale = scale;
+    }
+
+    /// For singing, laughs, sighs and the other vocal sounds: they keep the brighter source
+    /// they were shaped with (the sounds judged by a sound tagger, not a speech model),
+    /// without the man's speech tilt, which made his laugh and giggle 2 dB quieter and duller.
+    pub fn set_bright_source(&mut self) {
+        self.speech_tilt = false;
     }
 
     /// Renders the whole utterance offline: peak-normalized to 0.86 with short fades,

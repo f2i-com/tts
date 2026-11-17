@@ -224,6 +224,8 @@ export interface VoiceOptions {
   pitchCoupling?: number;
   /** 0..1: how much the speaker is laughing while speaking (a smile in the voice, then the laugh breaking into the stressed vowels). */
   laughter?: number;
+  /** 0..1: vocal fry as a phrase runs out (0 = none, 0.5 = the plain voices' amount, 1 = strong and early). */
+  creak?: number;
   air?: number;
   closure?: number;
 }

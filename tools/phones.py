@@ -14,12 +14,23 @@ same sentences with its own timing:
             `praat-parselmouth`) against the values the synthesizer is told to make (its own
             control frames, no tracker on that side). This is what showed the dark /l/ before
             vowels and the /u/ that starts far forward after t d n s.
+  confusions
+            which sounds the phoneme recogniser mishears (for an insertion, "N_^_AH" says
+            it was heard between an N and an AH), in the synthesizer's rendering and
+            in the readers' recordings of the same sentences, scored against the same
+            dictionary pronunciation. The recogniser has habits of its own (it hears the weak
+            "and" as AH>AE, a flapped t as T>D, in real speech as much as in synthetic), so
+            only what it gets wrong far more often in the synth is the synth's fault. Without
+            --kinds it lists those. This is what showed /g/ heard as /d/ before back vowels
+            and "r" (one /g/ in seven; the readers never) and /b/ heard as /w/.
 
 Usage (from the crate root, after `cargo build --release --example say`):
 
   python tools/phones.py levels --phones DH,Z,V,T,D --context
   python tools/phones.py formants --phones L,UW,OW --n 300
   python tools/phones.py levels --tune "dh_late=0"        # with development hooks (--features dev-hooks)
+  python tools/phones.py confusions --n 400               # the synth's own mishearings
+  python tools/phones.py confusions --kinds "G>D,B>W,K>T"
 
 Recordings and labels beyond those eval.py has fetched are downloaded on first use (about
 100 KB per sentence, into tools/.cache/ref). The labels were aligned by machine: single
@@ -33,7 +44,7 @@ import re
 import subprocess
 import sys
 import urllib.request
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
 import numpy as np
@@ -48,8 +59,14 @@ CONTEXTS = ("_V", "V_V", "V_", "other")
 
 
 def prompts(n: int) -> list[str]:
-    lines = (E.REF / "bdl.txt").read_text().splitlines()[:n]
-    return [re.match(r'\( *\S+ +"(.*)" *\)', line).group(1) for line in lines]
+    """The texts of Arctic sentences a0001 to a{n}, by number: "" for one the prompt list lacks
+    (it has no a0507, so taking the lines in order put every later text with the next recording)."""
+    texts = {}
+    for line in (E.REF / "bdl.txt").read_text().splitlines():
+        m = re.match(r'\( *arctic_a(\d{4}) +"(.*)" *\)', line)
+        if m:
+            texts[int(m.group(1))] = m.group(2)
+    return [texts.get(i, "") for i in range(1, n + 1)]
 
 
 def recording(spk: str, idx: int) -> Path:
@@ -145,6 +162,8 @@ def cmd_levels(args) -> None:
         spk = E.SPEAKERS[voice]
         hs, ss, hl, sl = (defaultdict(list) for _ in range(4))
         for i, text in enumerate(prompts(args.n), start=1):
+            if not text:
+                continue
             h, sr = E.load(recording(spk, i))
             add_levels(hs, hl, E.resample(h, sr, 16000), human_phones(spk, i), wanted)
             wav = E.CACHE / "synth" / f"phones_{voice}.wav"
@@ -176,6 +195,8 @@ def cmd_formants(args) -> None:
         spk = E.SPEAKERS[voice]
         hs, ss = defaultdict(list), defaultdict(list)
         for i, text in enumerate(prompts(args.n), start=1):
+            if not text:
+                continue
             wav = E.CACHE / "synth" / f"phones_{voice}.wav"
             wav.parent.mkdir(parents=True, exist_ok=True)
             phones, ctl = synth(args.say, voice, text, wav, args.tune, frames=True)
@@ -198,6 +219,85 @@ def cmd_formants(args) -> None:
             print(f"  {name:3s} n={len(hs[name])}/{len(ss[name])}   " + "    ".join(cells))
 
 
+# ---------------------------------------------------------------------------- confusions
+
+
+def tally_confusions(wavs, texts, arps, kinds):
+    """Misheard phones in each recording against the pronunciation the synthesizer used:
+    counts per kind ("G>D" heard as, "G>-" missed, "+D" inserted), phones per name, the
+    total, and for the kinds asked about the words and neighbouring phones."""
+    counts, occur, total = Counter(), Counter(), 0
+    words_of, contexts_of = defaultdict(Counter), defaultdict(Counter)
+    for wav, text, arp in zip(wavs, texts, arps):
+        words = [w for w in re.split(r"[^a-z0-9']+", text.lower()) if w.strip("'")]
+        ref, ref_word = [], []
+        for wi, group in enumerate(arp.split("|")):
+            for ph in group.split():
+                base = re.sub(r"\d", "", ph)
+                ref.append({"AO": "AA", "AX": "AH"}.get(base, base))
+                ref_word.append(wi)
+        occur.update(ref)
+        total += len(ref)
+        hyp = E.recognize_phones(E.resample(*E.load(wav), 16000))
+        ri = 0
+        for r, h in E.align(ref, hyp):
+            at = None
+            if r is None:
+                kind = f"+{h}"
+                wi = ref_word[min(ri, len(ref) - 1)] if ref else 0
+                if kinds is None or kind in kinds:
+                    before = ref[ri - 1] if ri > 0 else "#"
+                    after = ref[ri] if ri < len(ref) else "#"
+                    contexts_of[kind][f"{before}_^_{after}"] += 1
+            else:
+                kind = f"{r}>{h or '-'}" if r != h else None
+                wi, at = ref_word[ri], ri
+                ri += 1
+            if not kind:
+                continue
+            counts[kind] += 1
+            if kinds is None or kind in kinds:
+                words_of[kind][words[wi] if wi < len(words) else "?"] += 1
+                if at is not None:
+                    before = ref[at - 1] if at > 0 else "#"
+                    after = ref[at + 1] if at + 1 < len(ref) else "#"
+                    contexts_of[kind][f"{before}_{after}"] += 1
+    return counts, occur, total, words_of, contexts_of
+
+
+def cmd_confusions(args) -> None:
+    kinds = [k.strip() for k in args.kinds.split(",") if k.strip()] or None
+    numbered = [(i, t) for i, t in enumerate(prompts(args.n), start=1) if t]
+    texts = [t for _, t in numbered]
+    env = dict(os.environ)
+    if args.tune:
+        env["VS_TUNE"] = args.tune
+    work = E.CACHE / "synth" / f"confusions_{os.getpid()}"
+    work.mkdir(parents=True, exist_ok=True)
+    for voice in args.voices.split(","):
+        spk = E.SPEAKERS[voice]
+        wavs = [work / f"{voice}_{i:04d}.wav" for i in range(len(texts))]
+        jobs = work / "jobs.tsv"
+        jobs.write_text("".join(f"{voice}\t{w}\t{t}\n" for w, t in zip(wavs, texts)), encoding="utf-8")
+        res = subprocess.run([args.say, "--batch", str(jobs), "--variation", "0", *args.flags.split(), "--dict", str(E.DICT)],
+                             check=True, capture_output=True, text=True, encoding="utf-8", env=env)
+        arps = res.stdout.splitlines()
+        syn = tally_confusions(wavs, texts, arps, kinds)
+        hum = tally_confusions([recording(spk, i) for i, _ in numbered], texts, arps, kinds)
+        print(f"{voice}: {len(texts)} sentences, {syn[2]} phones; misheard {sum(syn[0].values()) / syn[2]:.1%} "
+              f"of the synth's, {sum(hum[0].values()) / max(hum[2], 1):.1%} of the reader's")
+        shown = kinds or [k for k, _ in sorted(syn[0].items(), key=lambda kv: hum[0][kv[0]] - kv[1])[: args.top]]
+        for k in shown:
+            name = k.split(">")[0]
+            of = syn[1][name] if ">" in k else syn[2]
+            unit = f"of {of} {name}" if ">" in k else "insertions"
+            print(f"  {k:7s} synth {syn[0][k]:4d} ({syn[0][k] / max(of, 1):5.1%})   reader {hum[0][k]:4d} ({hum[0][k] / max(of, 1):5.1%})   {unit}")
+            if syn[0][k]:
+                print(f"          words: {', '.join(f'{w} {c}' for w, c in syn[3][k].most_common(8))}")
+                if syn[4][k]:
+                    print(f"          around: {', '.join(f'{w} {c}' for w, c in syn[4][k].most_common(8))}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -212,8 +312,16 @@ def main() -> None:
     sub.choices["levels"].add_argument("--context", action="store_true", help="split by neighbours: _V before a vowel, V_V between vowels, V_ after one")
     sub.choices["formants"].add_argument("--phones", default="IY,IH,EH,AE,AA,AO,AH,AX,UH,UW,ER,L,R,W,Y,M,N")
     sub.choices["formants"].add_argument("--min-ms", type=float, default=50.0)
+    c = sub.add_parser("confusions")
+    c.add_argument("--n", type=int, default=400, help="how many Arctic sentences (up to 593)")
+    c.add_argument("--voices", default="male,female")
+    c.add_argument("--say", default=str(E.SAY))
+    c.add_argument("--tune", default="", help="VS_TUNE overrides for the synthesizer")
+    c.add_argument("--kinds", default="", help='e.g. "G>D,B>W,+D" (default: the ones the synth gets wrong most often beyond the readers)')
+    c.add_argument("--top", type=int, default=12)
+    c.add_argument("--flags", default="", help='extra options for the say example, e.g. "--vowels EH=0.92/1/1"')
     args = ap.parse_args()
-    {"levels": cmd_levels, "formants": cmd_formants}[args.cmd](args)
+    {"levels": cmd_levels, "formants": cmd_formants, "confusions": cmd_confusions}[args.cmd](args)
 
 
 if __name__ == "__main__":

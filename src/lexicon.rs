@@ -361,10 +361,59 @@ impl Lexicon {
         if let Some(p) = self.lookup_with_morphology(word) {
             return p;
         }
+        if let Some(p) = self.drawn_out(word) {
+            return p;
+        }
         if let Some(p) = spell_out(word) {
             return p;
         }
         crate::g2p::pronounce(word)
+    }
+}
+
+impl Lexicon {
+    /// A word drawn out in writing ("sooo", "yeahhh", "pleeease", "okayyy") is the word it
+    /// stands for: every run of three or more of one letter is shortened to two and to one.
+    /// Where both are words, the everyday one in the core lexicon wins ("sooo" is "so", not
+    /// the name "Soo"; "goood" is "good", not "god"). (A single letter never counts: "www"
+    /// and "zzz" are spelled.)
+    fn drawn_out(&self, word: &str) -> Option<Vec<Phone>> {
+        let b = word.as_bytes();
+        let has_run = b.windows(3).any(|w| w[0] == w[1] && w[1] == w[2] && w[0].is_ascii_lowercase());
+        if !has_run {
+            return None;
+        }
+        let squeeze = |keep: usize| -> String {
+            let mut out = String::with_capacity(b.len());
+            let mut i = 0;
+            while i < b.len() {
+                let mut j = i;
+                while j < b.len() && b[j] == b[i] {
+                    j += 1;
+                }
+                let run = j - i;
+                let take = if run >= 3 { keep } else { run };
+                for _ in 0..take {
+                    out.push(b[i] as char);
+                }
+                i = j;
+            }
+            out
+        };
+        let mut found = None;
+        for keep in [2, 1] {
+            let w = squeeze(keep);
+            if w.len() < 2 {
+                continue;
+            }
+            if let Some(p) = self.lookup_with_morphology(&w) {
+                if self.user.contains_key(w.as_str()) || self.primary.contains_key(w.as_str()) {
+                    return Some(p);
+                }
+                found.get_or_insert(p);
+            }
+        }
+        found
     }
 }
 

@@ -1563,6 +1563,62 @@ mod tests {
     }
 
     #[test]
+    fn random_voices_differ_and_every_control_changes_the_voice() {
+        // random voices spread over the range of real adults, with their own vowels and habits
+        for gender in [Gender::Male, Gender::Female] {
+            let voices: Vec<VoiceConfig> = (0..40).map(|k| VoiceConfig::randomized(900 + k, Some(gender), None)).collect();
+            let sd = |f: &dyn Fn(&VoiceConfig) -> f64| {
+                let v: Vec<f64> = voices.iter().map(f).collect();
+                let m = v.iter().sum::<f64>() / v.len() as f64;
+                (v.iter().map(|x| (x - m) * (x - m)).sum::<f64>() / v.len() as f64).sqrt()
+            };
+            assert!(sd(&|v| v.tract_length_cm) > if gender == Gender::Male { 0.45 } else { 0.3 }, "{gender:?} tract");
+            assert!(sd(&|v| 12.0 * (v.pitch_hz / 100.0).log2()) > 1.3, "{gender:?} pitch");
+            assert!(sd(&|v| v.vowels[7][1]) > 0.02, "{gender:?}: back vowels fronted or not");
+            assert!(sd(&|v| v.breathiness) > 0.06 && sd(&|v| v.speed) > 0.04 && sd(&|v| v.creak) > 0.15, "{gender:?}");
+            for v in &voices {
+                let mut clean = v.clone();
+                clean.sanitize();
+                assert_eq!(&clean, v, "a random voice is inside every range");
+            }
+        }
+        // the voices render
+        let speech = Synth::new(VoiceConfig::randomized(7, None, None)).speak("Testing one, two, three.");
+        assert!(speech.samples.iter().all(|v| v.is_finite()) && rms(&speech.samples) > 0.01);
+
+        // breathiness slackens the pulse and lets breath through (it used to barely do anything)
+        let mean_on_vowels = |cfg: &VoiceConfig, f: fn(&Frame) -> f64| {
+            let speech = Synth::new(cfg.clone()).speak(PANGRAM);
+            let v: Vec<f64> = speech.frames.iter().filter(|fr| fr.phone.is_vowel() && fr.av > 0.5).map(f).collect();
+            v.iter().sum::<f64>() / v.len() as f64
+        };
+        let plain = VoiceConfig::female();
+        let mut breathy = plain.clone();
+        breathy.breathiness = 0.85;
+        assert!(mean_on_vowels(&breathy, |f| f.ah / f.av) > 2.0 * mean_on_vowels(&plain, |f| f.ah / f.av));
+        assert!(mean_on_vowels(&breathy, |f| f.lax) > mean_on_vowels(&plain, |f| f.lax) + 0.2);
+
+        // creak: none, the voice's own, more and earlier
+        let creaky_frames = |amount: f64| {
+            let mut cfg = VoiceConfig::male();
+            cfg.creak = amount;
+            Synth::new(cfg).speak("We walked home along the river. It was late.").frames.iter().filter(|f| f.creak > 0.05).count()
+        };
+        assert_eq!(creaky_frames(0.0), 0);
+        assert!(creaky_frames(1.0) > creaky_frames(0.5) && creaky_frames(0.5) > 0);
+        // ... and the plain voices are what they were
+        let mut half = VoiceConfig::male();
+        half.creak = 0.5;
+        assert_eq!(Synth::new(half).speak(PANGRAM).samples, Synth::new(VoiceConfig::male()).speak(PANGRAM).samples);
+
+        // the characters are all there, and none is another's copy
+        for id in ["crisp", "elder", "soft", "mellow"] {
+            let cfg = VoiceConfig::preset(id).unwrap_or_else(|| panic!("{id}"));
+            assert!(PRESETS.iter().filter(|p| p.id != id).all(|p| p.config() != cfg), "{id}");
+        }
+    }
+
+    #[test]
     fn randomized_and_registered_voices_work_in_dialogue_and_singing() {
         let mut tts = TTS::default();
         let alice = VoiceConfig::randomized(101, Some(Gender::Female), None);

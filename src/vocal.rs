@@ -1660,6 +1660,7 @@ mod tests {
         let (frames, voice) = perform(sound, cfg, intensity, length, take);
         let n = frames.len();
         let mut renderer = Renderer::new(frames, &voice);
+        renderer.set_bright_source();
         let mut pcm = vec![0.0f32; n * SAMPLES_PER_FRAME];
         renderer.render(n, &mut pcm);
         (pcm, renderer.into_frames())

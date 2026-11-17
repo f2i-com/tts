@@ -1593,6 +1593,7 @@ pub(crate) fn synthesize_singing_raw(
     let frames = rasterize_singing_frames(&segs, &nodes, &cfg, score.legato);
     let words = word_timings_from_list(&words_text, &frames);
     let mut renderer = Renderer::new(frames, &cfg);
+    renderer.set_bright_source();
     let n_frames = renderer.frames().len();
     let mut samples = vec![0.0f32; n_frames * SAMPLES_PER_FRAME];
     if !samples.is_empty() {

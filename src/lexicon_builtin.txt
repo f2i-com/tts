@@ -169,7 +169,7 @@ yesterday Y EH1 S T ER D EY2
 tonight T AX N AY1 T
 maybe M EY1 B IY0
 perhaps P ER HH AE1 P S
-actually AE1 K CH UW0 AX L IY0
+actually AE1 K CH AX L IY0
 probably P R AA1 B AX B L IY0
 because B IH0 K AO1 Z
 though DH OW1

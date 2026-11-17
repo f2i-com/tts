@@ -64,7 +64,7 @@ fn main() {
             }
             "--speed" | "--pitch" | "--expressiveness" | "--breathiness" | "--warmth" | "--roughness"
             | "--vibrato" | "--tract" | "--nasality" | "--chest" | "--crispness" | "--bass" | "--presence"
-            | "--brightness" | "--variation" | "--pauses" | "--breaths" | "--open" | "--subglottal" | "--room" | "--pitch-coupling" | "--air" | "--closure" => {
+            | "--brightness" | "--variation" | "--pauses" | "--breaths" | "--open" | "--subglottal" | "--room" | "--pitch-coupling" | "--air" | "--closure" | "--creak" => {
                 let v: f64 = args.next().and_then(|v| v.parse().ok()).expect("option needs a number");
                 overrides.push((arg[2..].to_string(), v));
             }
@@ -124,6 +124,7 @@ fn main() {
                 "pitch-coupling" => cfg.pitch_coupling = *v,
                 "air" => cfg.air = *v,
                 "closure" => cfg.closure = *v,
+                "creak" => cfg.creak = *v,
                 _ => {}
             }
         }

@@ -62,7 +62,7 @@ N_ARCTIC = 16
 ARCTIC = "http://festvox.org/cmu_arctic/cmu_arctic/cmu_us_{spk}_arctic"
 TUNE = ""  # VS_TUNE string forwarded to the synthesizer (development parameter overrides)
 QUICK = False
-FEMALE_VOICES = {"female", "bright", "whisper", "clear_alto", "warm_mezzo", "bright_soprano", "young_bright", "soft_whisper"}
+FEMALE_VOICES = {"female", "bright", "whisper", "soft", "mellow", "clear_alto", "warm_mezzo", "bright_soprano", "young_bright", "soft_whisper"}
 
 # Phonetically balanced "Harvard sentences" (IEEE 1969), used for intelligibility only.
 HARVARD = [

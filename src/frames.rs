@@ -146,8 +146,10 @@ fn transition_rule(a: Class, b: Class) -> (f64, f64, f64) {
         (Nasal, Vowel) => (10.0, 45.0, 0.28),
         (Vowel, Fricative) => (40.0, 15.0, 0.66),
         (Fricative, Vowel) => (15.0, 40.0, 0.34),
+        (Fricative, Glide) => (15.0, 8.0, 0.78),
         (Vowel, Aspirate) | (Aspirate, Vowel) => (15.0, 15.0, 0.5),
         (Release, Liquid) | (Release, Glide) => (5.0, 35.0, 0.35),
+        (Liquid, Closure) => (18.0, 10.0, 0.52),
         (Closure, _) => (0.0, 20.0, 0.2),
         (_, Closure) => (25.0, 10.0, 0.75),
         (Vowel, Release) | (Release, _) => (10.0, 15.0, 0.5),
@@ -169,6 +171,7 @@ fn shape_transitions(
     scale: f64,
     formant_scale: [f64; 3],
     undershoot_ms: f64,
+    xword_tr: f64,
 ) {
     let raw: Vec<[f64; 3]> = frames.iter().map(|f| [f.f1, f.f2, f.f3]).collect();
     let n_seg = bounds.len();
@@ -188,6 +191,11 @@ fn shape_transitions(
         if ms_a == 0.0 && ms_b == 0.0 {
             continue;
         }
+        let w_scale = if segs[k].word >= 0 && segs[k + 1].word >= 0 && segs[k].word != segs[k + 1].word {
+            xword_tr
+        } else {
+            1.0
+        };
         // Nasals pull their neighbours toward the closure's locus but keep their own
         // murmur resonances, so the spectrum switches abruptly at the closure, as in speech.
         let ta = loci[k].unwrap_or(raw[bounds[k].1 - 1]);
@@ -197,7 +205,7 @@ fn shape_transitions(
             ta[1] + (tb[1] - ta[1]) * w,
             ta[2] + (tb[2] - ta[2]) * w,
         ];
-        let to_frames = |ms: f64| ((ms * scale / FRAME_MS) + 0.5).floor() as usize;
+        let to_frames = |ms: f64| ((ms * scale * w_scale / FRAME_MS) + 0.5).floor() as usize;
         if loci[k].is_none() {
             right[k] = Some((to_frames(ms_a), vb));
         }
@@ -291,10 +299,14 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
     let zv_bar = tune("zv_bar", 1.0);
     // How breathy the very end of a phrase gets.
     let tail_lax = tune("tail_lax", 0.42);
+    let tail_drop = tune("tail_drop", 0.16);
     // Creak at the end of a phrase (development hooks: how strong, and from which point of
     // the last vowel).
-    let tail_creak = tune("tail_creak", if female { 0.52 } else { 0.6 });
-    let creak_from = tune("creak_from", 0.6);
+    // Vocal fry as a phrase runs out (the `creak` setting: 0.5 is the plain voices' amount;
+    // more also starts it earlier in the last vowel).
+    let creak_amount = clamp(cfg.creak, 0.0, 1.0);
+    let tail_creak = (tune("tail_creak", 0.22) * creak_amount / 0.5).min(1.0);
+    let creak_from = tune("creak_from", 0.6) - 0.3 * ((creak_amount - 0.5) / 0.5).max(0.0);
     let base_f0 = cfg.pitch_hz;
     let tract_cm = clamp(cfg.tract_length_cm, 12.2, 21.5);
     let formant_scale = 17.5 / tract_cm;
@@ -303,6 +315,15 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
     let f3_scale = (1.0 + (formant_scale - 1.0) * 0.90) * cfg.formants[2];
 
     let breathiness = clamp(cfg.breathiness, 0.0, 0.85);
+    // A breathy voice: the folds part along their length and never quite close, so the pulse
+    // is slack, breath streams through, and the first resonance is damped (all only above the
+    // plain voices' own breathiness, which they were tuned with). Without this the setting
+    // hardly changed the voice: at its most the harmonics stood 1 dB less above the noise;
+    // now 6 dB (male) and 7 dB (female) less, as in a really breathy voice.
+    let breathy = crate::config::breathy_excess(breathiness);
+    let breathy_lax = tune("breathy_lax", 0.3) * breathy;
+    let breathy_ah = tune("breathy_ah", 0.2) * breathy;
+    let breathy_b1 = tune("breathy_b1", 40.0) * breathy;
     let base_nasality = clamp(cfg.nasality, 0.0, 0.80);
     let crispness = clamp(cfg.crispness, 0.45, 1.6);
     let expressiveness = clamp(cfg.expressiveness, 0.0, 3.0);
@@ -315,6 +336,7 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
     let acc_peak = tune("acc_peak", 0.30);
     let dip_hold = tune("dip_hold", 0.22);
     let dip_reach = tune("dip_reach", 0.94);
+    let v_onset_lift = if cfg.folds { 0.0 } else { tune("v_onset_lift", 1.0) };
 
     // Pass 1: frames + per-clause timing and accent centres.
     let mut clause_spans: Vec<ClauseSpan> = timeline
@@ -364,8 +386,12 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
                 0.5
             };
             // Diphthongs: hold the nucleus briefly, then glide toward (not quite onto) the offglide.
+            // /oy/ keeps its rounded start for 40% of the vowel and then glides all the way
+            // to the front, as both readers do; with the shared shape it began to move at
+            // once and stopped short, and was heard as "or" or "ah" ("joy" as "jaw").
+            let (hold, reach) = if seg.phone == Ph::OY { (0.4, 1.0) } else { (dip_hold, dip_reach) };
             let g = match seg.glide {
-                Some(_) => smoothstep((u - dip_hold) / (1.0 - dip_hold)) * dip_reach,
+                Some(_) => smoothstep((u - hold) / (1.0 - hold)) * reach,
                 None => 0.0,
             };
             let mix = |a: f64, pick: fn(&tables::Spec) -> f64| match &seg.glide {
@@ -390,11 +416,13 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
 
             if seg.onset_devoice {
                 // Aspirated, devoiced sonorant onset after a voiceless stop.
-                let v_ramp = clamp((u - 0.22) / 0.48, 0.0, 1.0);
-                seg_av = s.av * (0.08 + 0.92 * v_ramp);
-                seg_ah = s.ah.max((1.0 - v_ramp) * 0.26 * crispness);
-                lax_extra = (1.0 - v_ramp) * 0.50;
-                devoice_damp = (1.0 - v_ramp) * 150.0;
+                let hold = if cfg.folds { 0.22 } else { tune("devoice_hold", 0.22) };
+                let span = if cfg.folds { 0.48 } else { tune("devoice_span", 0.40) };
+                let v_ramp = clamp((u - hold) / span.max(0.15), 0.0, 1.0);
+                seg_av = s.av * (0.06 + 0.94 * v_ramp);
+                seg_ah = s.ah.max((1.0 - v_ramp) * 0.30 * crispness);
+                lax_extra = (1.0 - v_ramp) * (0.50 - 0.18 * v_onset_lift);
+                devoice_damp = (1.0 - v_ramp) * (150.0 - 65.0 * v_onset_lift);
             } else if seg.phone == Ph::HH {
                 let h_env = (PI * clamp(u * 0.90 + 0.05, 0.0, 1.0)).sin();
                 seg_ah = s.ah * h_env * h_noise;
@@ -403,7 +431,9 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
                 seg_av = voiced_level * (seg.breathy_h + (1.0 - seg.breathy_h) * u * u);
                 lax_extra = 0.42;
             } else if seg.shape == Shape::Vowel {
-                let arch = 0.92 + 0.10 * (PI * clamp(u * 0.92 + 0.05, 0.0, 1.0)).sin();
+                let base_arch = 0.92 + 0.07 * v_onset_lift;
+                let amp_arch = 0.10 - 0.05 * v_onset_lift;
+                let arch = base_arch + amp_arch * (PI * clamp(u * 0.92 + 0.05, 0.0, 1.0)).sin();
                 seg_av *= arch * (1.0 - 0.05 * g);
                 // Rising questions and comma continuations keep regular voicing rather than
                 // dropping into phrase-final creak.
@@ -417,7 +447,7 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
                         seg_av *= 1.0 - tail_frac * 0.10;
                         lax_extra = tail_frac * tail_lax * 0.35;
                     } else {
-                        seg_av *= 1.0 - tail_frac * 0.24;
+                        seg_av *= 1.0 - tail_frac * tail_drop;
                         lax_extra = tail_frac * tail_lax;
                     }
                 }
@@ -445,6 +475,29 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
                 seg_af *= on;
                 seg_ah *= on;
             }
+            let t_ms = fi as f64 * FRAME_MS;
+            let soft_ms = if seg.phone == Ph::R {
+                42.0
+            } else if seg.shape == Shape::Vowel {
+                (s.dur * 0.32).clamp(10.0, 28.0)
+            } else {
+                tune("soft_onset_ms", 30.0)
+            };
+            if seg.soft_onset && t_ms < soft_ms + 4.0 && tune("soft_onset", 1.0) > 0.5 {
+                // Smooth vocal-fold adduction out of silence (avoids plosive [b]/[ð] step edges).
+                let on = smoothstep(t_ms / soft_ms);
+                seg_av *= 0.04 + 0.96 * on;
+                lax_extra = lax_extra.max(0.55 * (1.0 - on));
+            } else if seg.hiatus_onset && t_ms < 18.0 && tune("hiatus_dip", 0.0) > 0.5 {
+                let on = smoothstep(t_ms / 16.0);
+                seg_av *= 0.65 + 0.35 * on;
+            } else if seg.word_onset && t_ms < 15.0 {
+                let dip = tune("xword_dip", if female { 0.0 } else { tune("xword_dip_m", 0.18) });
+                if dip > 0.0 {
+                    let on = smoothstep(t_ms / 14.0);
+                    seg_av *= (1.0 - dip) + dip * on;
+                }
+            }
 
             let mut seg_nasal = s.nasal;
             let mut seg_velum = s.velum;
@@ -469,6 +522,7 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
                 f2,
                 f3,
                 b1: mix(s.b1, |e| e.b1) * (1.0 + breathiness * 0.20)
+                    + breathy_b1
                     + wall_damp
                     + open_damp
                     + prox_damp
@@ -480,23 +534,37 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
                 ah: if whisper {
                     seg_ah.max(seg_av * 0.65)
                 } else {
-                    seg_ah + seg_av * breathiness * 0.16
+                    seg_ah + seg_av * (breathiness * 0.16 + breathy_ah)
                 },
                 af: seg_af,
                 avb: if whisper { 0.0 } else { seg_avb },
                 nasal: if whisper { 0.0 } else { seg_nasal },
                 oral_seal: s.oral_seal,
                 fnz: s.fnz * f1_scale,
-                lax: lax_extra + if seg.stress == 0 { 0.14 } else { 0.0 },
+                lax: lax_extra + if seg.stress == 0 { 0.14 } else { 0.0 } + breathy_lax,
                 creak,
-                fric_f1: clamp(s.fric_f1 * (1.0 + (formant_scale - 1.0) * 0.65), 600.0, 9500.0),
+                fric_f1: {
+                    let fs_mult = if matches!(seg.phone, Ph::K | Ph::G) && s.fric_f1 < 1950.0 {
+                        f2_scale
+                    } else {
+                        1.0 + (formant_scale - 1.0) * 0.65
+                    };
+                    clamp(s.fric_f1 * fs_mult, 600.0, 9500.0)
+                },
                 fric_b1: s.fric_b1 * formant_scale,
                 fric_f2: clamp(s.fric_f2 * (1.0 + (formant_scale - 1.0) * 0.60), 1200.0, 10200.0),
                 fric_b2: s.fric_b2 * formant_scale,
                 fric_g1: s.fric_g1,
                 fric_g2: s.fric_g2,
                 fric_hp: s.fric_hp * (1.0 + (formant_scale - 1.0) * 0.60),
-                fric_lp: s.fric_lp * (1.0 + (formant_scale - 1.0) * 0.60),
+                fric_lp: {
+                    let lp_mult = if matches!(seg.phone, Ph::K | Ph::G) && s.fric_f1 < 1950.0 {
+                        f2_scale
+                    } else {
+                        1.0 + (formant_scale - 1.0) * 0.60
+                    };
+                    s.fric_lp * lp_mult
+                },
                 tone_hz: 1500.0,
                 tone: 0.0,
                 is_closure: seg.is_closure,
@@ -545,15 +613,15 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
     // of a real voice, and the monotone that goes with it.)
     let t_first = tune("f0_first", 0.058);
     let t_comma = tune("comma_tone", -0.08);
-    let t_decl = tune("decl", 0.0);
+    let t_decl = tune("decl", if female { 0.40 } else { 0.38 });
     let t_fall = tune("fall", if female { 1.0 } else { 1.35 });
-    let t_rise = tune("rise", if female { 1.58 } else { 1.8 });
+    let t_rise = tune("rise", if female { 1.15 } else { 1.22 });
     let t_on_first = tune("on_first", 0.42);
     let t_on_reset = tune("on_reset", 0.14);
     let t_on_tau = tune("on_tau", 0.5);
     let t_fall_from = tune("fall_from", 0.85);
     let t_q_from = tune("q_from", 0.83);
-    let t_wh_fall = tune("wh_fall", 0.14);
+    let t_wh_fall = tune("wh_fall", 0.22);
     let t_excl_lift = tune("excl_lift", 0.22);
     let t_excl_fall = tune("excl_fall", 0.45);
     let t_decl_shape = tune("decl_shape", 0.63);
@@ -567,6 +635,20 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
     let mut phrase_pos = vec![0.0f32; n];
     let mut clause_log_sum = vec![0.0f64; clause_spans.len()];
     let mut clause_voiced_cnt = vec![0u32; clause_spans.len()];
+    // Sentence group for each clause (clauses up to '.', '?' or '!'), so short comma clauses
+    // ("Lord,", "rained,", "Phil.") share one coherent sentence pitch range and onset arch.
+    let sent_of: Vec<(usize, usize)> = (0..clause_spans.len())
+        .map(|c| {
+            let start = (0..c)
+                .rev()
+                .find(|&j| matches!(clause_spans[j].meta.punc, '.' | '?' | '!'))
+                .map_or(0, |j| j + 1);
+            let end = (c..clause_spans.len())
+                .find(|&j| matches!(clause_spans[j].meta.punc, '.' | '?' | '!'))
+                .unwrap_or(clause_spans.len().saturating_sub(1));
+            (start, end)
+        })
+        .collect();
 
     for i in 0..n {
         let fr = &frames[i];
@@ -587,7 +669,8 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
         let pos_b = (t_rel / voiced_dur).min(1.0);
 
         // Phrase onset arch + declination (longer phrases drift further down in total)
-        let sentence_start = ci == 0 || matches!(clause_spans[ci as usize - 1].meta.punc, '.' | '?' | '!');
+        let (s_start, _) = sent_of[ci as usize];
+        let sentence_start = ci as usize == s_start;
         let mut on_amp = if sentence_start { t_on_first } else { t_on_reset };
         if meta.is_yes_no_question {
             on_amp *= 0.25;
@@ -688,7 +771,7 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
 
     // Loudness declination: like pitch, vocal effort drifts down through a phrase (real
     // speakers lose about 4 dB from the first vowel to the last).
-    let fade_db = tune("fade_db", 2.0);
+    let fade_db = tune("fade_db", 1.2);
     for i in 0..n {
         let g = 10f64.powf(-fade_db * phrase_pos[i] as f64 / 20.0);
         frames[i].av *= g;
@@ -700,8 +783,8 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
     // exclamations (tools/style.py).
     let st = std::f64::consts::LN_2 / 12.0;
     let (reg_yn, reg_wh, reg_excl) = (
-        tune("reg_yn", if female { 1.7 } else { 3.0 }) * st,
-        tune("reg_wh", 3.5) * st,
+        tune("reg_yn", if female { 0.90 } else { 1.00 }) * st,
+        tune("reg_wh", 1.15) * st,
         tune("reg_excl", 4.0) * st,
     );
     let register: Vec<f64> = (0..clause_spans.len())
@@ -723,12 +806,14 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
         })
         .collect();
 
-    let f0_gain = tune("f0_gain", if female { 0.4 } else { 0.15 });
+    let f0_gain = tune("f0_gain", if female { 0.4 } else { 0.30 });
     // The lowest pitch the voice settles on, in semitones under its own pitch, and how far
     // above it a fall starts to level out. Without it a final fall ran on down to 9
     // semitones under; real speakers end 3-4 under (tools/model_gaps.py).
     let floor_depth = tune("f0_floor_knee", 2.5) * st;
     let floor_knee = floor_depth - tune("f0_floor", if female { 4.5 } else { 5.0 }) * st;
+    let sent_center = tune("sent_center", 0.0);
+    let short_scent = tune("short_scent", 1.0);
     let mut last_valid_f0 = base_f0;
     for i in 0..n {
         let ci = frames[i].clause_idx;
@@ -737,10 +822,22 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
             && clause_spans[ci as usize].end_sec > clause_spans[ci as usize].start_sec
         {
             let cu = ci as usize;
-            let mean_clause_log = if clause_voiced_cnt[cu] > 0 {
+            let clause_mean = if clause_voiced_cnt[cu] > 0 {
                 clause_log_sum[cu] / clause_voiced_cnt[cu] as f64
             } else {
                 0.0
+            };
+            let sc_w = sent_center.max(
+                short_scent * clamp((90.0 - clause_voiced_cnt[cu] as f64) / 55.0, 0.0, 0.72),
+            );
+            let mean_clause_log = if sc_w > 0.0 {
+                let (s_start, s_end) = sent_of[cu];
+                let sum: f64 = clause_log_sum[s_start..=s_end].iter().sum();
+                let cnt: u32 = clause_voiced_cnt[s_start..=s_end].iter().sum();
+                let sent_mean = if cnt > 0 { sum / cnt as f64 } else { clause_mean };
+                clause_mean + (sent_mean - clause_mean) * sc_w
+            } else {
+                clause_mean
             };
             let mut centered_log = raw_log_f0[i] as f64 - mean_clause_log * 0.96 + register[cu];
             // The bottom of the voice: a fall does not go on down, it settles on the lowest
@@ -773,10 +870,11 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
     // speaker's (tools/dynamics.py). These values match them, and cut the phoneme error rate
     // by 1.3 (male) and 1.8 (female) points on 146 sentences.
     let sm_nasal = tune("sm_nasal", 0.8);
-    let sm_av_on = tune("sm_av_on", 0.6);
+    let sm_av_on = tune("sm_av_on", if cfg.folds { 0.60 } else { 0.74 });
     let sm_av_off = tune("sm_av_off", if female { 0.6 } else { 0.8 });
     let abduct_lax = tune("abduct_lax", if female { 0.45 } else { 0.0 });
 
+    let xword_tr = tune("xword_tr", if female { 1.0 } else { 0.76 });
     shape_transitions(
         &mut frames,
         &timeline.segments,
@@ -784,6 +882,7 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
         tune("tr_scale", 0.55) / crisp_speed,
         [f1_scale, f2_scale, f3_scale],
         tune("undershoot", 30.0),
+        xword_tr,
     );
 
     for i in 1..n {
@@ -801,18 +900,23 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
         c.velum = p.velum + (c.velum - p.velum) * a_mouth;
 
         // Soft vocal-fold adduction at voice onset and abduction at offset — except after a
-        // stop, where voicing starts abruptly at the release.
+        // stop, where voicing starts abruptly at the release, and into a stop closure or a
+        // voiceless fricative, where the oral tract seals or the folds abduct promptly so
+        // open-mouth vowel formants do not bleed through /b p/ ("garvidge") or voice /s/ ("Gregzon").
+        let into_seal_or_voiceless = c.av < 0.02 && (c.is_closure || c.af > 0.04);
         let a_av = if c.av > p.av {
             if p.is_closure || p.is_burst || c.is_burst {
                 release_attack
             } else {
                 sm_av_on
             }
+        } else if into_seal_or_voiceless {
+            tune("seal_av_off", 0.88)
         } else {
             sm_av_off
         };
         if c.av > p.av + 0.08 {
-            c.lax = (c.lax + (c.av - p.av) * 0.55).min(0.85);
+            c.lax = (c.lax + (c.av - p.av) * (0.55 - 0.27 * v_onset_lift)).min(0.85);
         } else if p.av > c.av + 0.08 && abduct_lax > 0.0 {
             c.lax = (c.lax + (p.av - c.av) * abduct_lax).min(0.85);
         }
@@ -839,8 +943,12 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
             p.af + (c.af - p.af) * 0.55
         };
         c.avb = p.avb + (c.avb - p.avb) * 0.55;
-        c.nasal = p.nasal + (c.nasal - p.nasal) * sm_nasal;
-        c.oral_seal = p.oral_seal + (c.oral_seal - p.oral_seal) * sm_nasal;
+        // Leaving a nasal into a vowel, the mouth opens right away while the velum closes
+        // slightly more gently so oral pressure does not pop into an epenthetic [d] or [g].
+        let a_nasal = if c.nasal < p.nasal { tune("sm_nasal_off", 0.72) } else { sm_nasal };
+        let a_seal = if c.oral_seal < p.oral_seal { tune("sm_seal_off", 0.85) } else { sm_nasal };
+        c.nasal = p.nasal + (c.nasal - p.nasal) * a_nasal;
+        c.oral_seal = p.oral_seal + (c.oral_seal - p.oral_seal) * a_seal;
         c.rms = p.rms + (c.rms - p.rms) * 0.36;
     }
 
@@ -861,6 +969,26 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
     // Light smoothing so microprosody blends into the phrase contour.
     for i in 1..n {
         frames[i].f0 = frames[i - 1].f0 + (frames[i].f0 - frames[i - 1].f0) * 0.35;
+    }
+
+    let v_junc = tune("v_junc", 0.0);
+    if v_junc > 0.0 {
+        for (k, seg) in timeline.segments.iter().enumerate() {
+            if k > 0
+                && seg.word_onset
+                && seg.phone.is_vowel()
+                && !timeline.segments[k - 1].phone.is_vowel()
+                && timeline.segments[k - 1].phone != Ph::SIL
+            {
+                let (s0, e0) = bounds[k];
+                let span = (e0 - s0).min(4);
+                for j in 0..span {
+                    let w = smoothstep((j as f64 + 0.3) / span.max(1) as f64);
+                    frames[s0 + j].av *= (1.0 - v_junc) + v_junc * w;
+                    frames[s0 + j].lax = (frames[s0 + j].lax + 0.35 * v_junc * (1.0 - w)).min(0.85);
+                }
+            }
+        }
     }
 
     // Development hook: `VS_F0_FILE` names a text file with one pitch value (Hz) per frame
@@ -976,15 +1104,20 @@ fn laugh_while_speaking(mut frames: Vec<Frame>, sentence_end: &[bool], cfg: &Voi
         return frames;
     }
 
-    let mut rng = 0x1a09_4e21u32 ^ cfg.seed.wrapping_mul(0x9e37_79b9) ^ (frames.len() as u32).wrapping_mul(0x85eb_ca6b);
+    let word_cnt = frames.last().map_or(0, |f| (f.word.max(0) as u32).wrapping_add(1));
+    let mut rng = 0x1a09_4e21u32
+        ^ cfg.seed.wrapping_mul(0x9e37_79b9)
+        ^ word_cnt.wrapping_mul(0x85eb_ca6b)
+        ^ (sentence_end.len() as u32).wrapping_mul(0xc2b2_ae35);
     let mut uniform = move || {
         rng ^= rng << 13;
         rng ^= rng >> 17;
         rng ^= rng << 5;
         rng as f64 / u32::MAX as f64
     };
+    let _ = (uniform(), uniform());
     // (more than a third of the stressed vowels, and the words themselves are lost)
-    let in_word = tune("laugh_in_word", 0.3) * depth + 0.08;
+    let in_word = tune("laugh_in_word", 0.35) * depth + 0.10;
     let after_sentence = tune("laugh_after", 0.8) * depth + 0.2;
     let jump = tune("laugh_jump", 4.0) * (0.6 + 0.4 * depth);
     let gap_ms = tune("laugh_gap_ms", 70.0);
@@ -993,9 +1126,10 @@ fn laugh_while_speaking(mut frames: Vec<Frame>, sentence_end: &[bool], cfg: &Voi
     let n = frames.len();
     let mut out: Vec<Frame> = Vec::with_capacity(n + n / 3);
     let mut takes = 0u32;
+    let mut held_laugh = 0.20 * depth;
     let mut i = 0;
     while i < n {
-        // a stressed vowel: the laugh may break into it
+        // a stressed vowel: the laugh may break into it (held-in laughter builds between breaks)
         let stressed_vowel = |f: &Frame| f.phone.is_vowel() && f.stress == 1 && f.av > 0.45;
         if stressed_vowel(&frames[i]) {
             let start = i;
@@ -1003,14 +1137,16 @@ fn laugh_while_speaking(mut frames: Vec<Frame>, sentence_end: &[bool], cfg: &Voi
                 i += 1;
             }
             let run = i - start;
-            if run >= 10 && uniform() < in_word {
-                // the vowel begins as itself, is cut off by a puff of breath, and said again
-                let cut = start + (run * 3 / 5).max(8);
-                out.extend_from_slice(&frames[start..cut]);
-                let base = frames[cut - 1].clone();
-                let calls = if uniform() < 0.5 * depth { 2 } else { 1 };
-                for c in 0..calls {
-                    let n_gap = (gap_ms / FRAME_MS).round() as usize;
+            if run >= 10 {
+                if uniform() < (in_word + held_laugh).clamp(0.05, 0.88) {
+                    held_laugh = -0.10 * depth;
+                    // the vowel begins as itself, is cut off by a puff of breath, and said again
+                    let cut = start + (run * 3 / 5).max(8);
+                    out.extend_from_slice(&frames[start..cut]);
+                    let base = frames[cut - 1].clone();
+                    let calls = if uniform() < 0.5 * depth { 2 } else { 1 };
+                    for c in 0..calls {
+                        let n_gap = (gap_ms / FRAME_MS).round() as usize;
                     for k in 0..n_gap {
                         let w = (PI * (k as f64 + 0.5) / n_gap as f64).sin();
                         let mut f = base.clone();
@@ -1032,8 +1168,12 @@ fn laugh_while_speaking(mut frames: Vec<Frame>, sentence_end: &[bool], cfg: &Voi
                         f.jaw = (base.jaw * 1.1).min(1.0);
                         out.push(f);
                     }
+                    }
+                    out.extend_from_slice(&frames[cut..i]);
+                } else {
+                    held_laugh = (held_laugh + 0.22 * depth).min(0.45);
+                    out.extend_from_slice(&frames[start..i]);
                 }
-                out.extend_from_slice(&frames[cut..i]);
             } else {
                 out.extend_from_slice(&frames[start..i]);
             }

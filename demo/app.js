@@ -138,6 +138,7 @@ const SLIDERS_PHYSICS = [
   ["roughness", "Roughness", 0, 0.75, 0.01, ""],
   ["nasality", "Nasality", 0, 0.8, 0.01, ""],
   ["vibrato", "Vibrato depth", 0, 1, 0.01, ""],
+  ["creak", "Vocal fry (creak)", 0, 1, 0.05, ""],
   ["air", "Air above 5 kHz", 0, 1, 0.01, ""],
   ["formants.0", "Vowel openness (F1)", 0.8, 1.25, 0.01, "×"],
   ["formants.1", "Tongue frontness (F2)", 0.8, 1.25, 0.01, "×"],
@@ -166,6 +167,10 @@ const PRESET_META = {
   female: ["208 Hz", "14.2 cm"],
   bright: ["222 Hz", "lively"],
   whisper: ["no voicing"],
+  crisp: ["118 Hz", "firm"],
+  elder: ["124 Hz", "older"],
+  soft: ["192 Hz", "breathy"],
+  mellow: ["178 Hz", "low, warm"],
 };
 
 // Lettering drawn on the plates (the same faces the page uses).

@@ -33,7 +33,9 @@ fn tables() -> &'static Tables {
         let mut letters = HashMap::with_capacity(52_000);
         let mut stress = HashMap::with_capacity(2_000);
         for line in RULES.lines() {
-            if line.is_empty() || line.starts_with('#') {
+            // (a comment is "# ..."; a key that starts with "#" is a rule for the start of a
+            // word - "#.h.i HH" - and there are thousands of them)
+            if line.is_empty() || line == "#" || line.starts_with("# ") {
                 continue;
             }
             let Some((key, value)) = line.split_once(' ') else { continue };
@@ -225,6 +227,10 @@ mod tests {
         }
         assert!(pronounce("glorp").iter().any(|p| p.stress == 1));
         assert!(say("feebly").starts_with("F IY1 B"), "{}", say("feebly"));
+        // the rules for the start of a word ("#.h.i HH") are read, not skipped as comments
+        for word in ["hickling", "hiyo", "heston", "hinterberg"] {
+            assert!(say(word).starts_with("HH "), "{word}: {}", say(word));
+        }
         assert!(pronounce("").is_empty());
         assert!(pronounce("123").is_empty());
     }

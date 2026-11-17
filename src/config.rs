@@ -106,6 +106,9 @@ pub struct VoiceConfig {
     /// voice (lips spread, pitch up, breath in it); more, and the laugh breaks into the
     /// stressed vowels, which are drawn out and shake with it ("I ca-ha-han't believe it").
     pub laughter: f64,
+    /// 0..1 - vocal fry: how far the voice drops into creak (slow, uneven pulses) as a phrase
+    /// runs out. 0 = never, 0.5 = the plain voices' own amount, 1 = strongly and early.
+    pub creak: f64,
     /// How abruptly the vocal folds shut at the end of each cycle: 0 = gently (a soft, dark
     /// voice), 1 = sharply (bright, with harmonics far up). This is the tone of the voice at
     /// its source. Defaults: 0.75 for the male voice, 0.25 for the female one - the values
@@ -120,13 +123,19 @@ pub struct VoiceConfig {
 /// spectrum is then far closer to a reference voice's (tools/closeness.py) and no sound is
 /// misheard more often, at a cost of 0.02-0.05 on a naturalness predictor that marks any
 /// synthetic top band down.
-pub const DEFAULT_AIR: f64 = 0.4;
+pub const DEFAULT_AIR: f64 = 0.14;
 /// Defaults of the `closure` setting.
-pub const MALE_CLOSURE: f64 = 0.75;
-pub const FEMALE_CLOSURE: f64 = 0.25;
+pub const MALE_CLOSURE: f64 = 0.78;
+pub const FEMALE_CLOSURE: f64 = 0.43;
 /// Open quotient of the default voices. Measured on 146 sentences against the earlier 0.58.
 pub const MALE_OPEN_QUOTIENT: f64 = 0.66;
 pub const FEMALE_OPEN_QUOTIENT: f64 = 0.66;
+
+/// How breathy a voice is beyond the plain voices (0 at their own breathiness, 0.2, and less;
+/// 1 at the most the setting allows): what slackens the pulse and lets more breath through.
+pub fn breathy_excess(breathiness: f64) -> f64 {
+    ((breathiness - 0.2) / 0.65).clamp(0.0, 1.0)
+}
 
 /// Number of vowels with individual formant multipliers.
 pub const VOWEL_COUNT: usize = 16;
@@ -147,35 +156,45 @@ pub fn vowel_index(ph: Ph) -> Option<usize> {
 /// mouth), most of all in a woman's voice, and /u/ and /o/ are further front. Both tables
 /// were measured on reference voices (`tools/fit_voice.py --vowels`). On 146 sentences the
 /// female voice gains 0.10 predicted naturalness and loses a point of misheard sounds with
-/// hers, the male voice gains 0.05 with his.
+/// hers, the male voice gains 0.05 with his. The female third formants were then brought
+/// down to those of a woman reading (`tools/phones.py formants`: they stood 5-15% above
+/// hers in every vowel, where the man's match his reader's), for another 0.09 and a point
+/// fewer misheard sounds on 90 sentences; and the second formants of her front vowels half
+/// way down to hers (they stood 7-14% above), for a little more of both. The vowel of
+/// "could" and "good" (UH) has a lower F1 and higher F2 and F3 in both voices than the fit
+/// gave (her F2 stood 7-11% below her reader's): it was heard as the vowel of "cot" or
+/// "coat" one time in six, against one in fifty for the readers. The man's /i/ has an F1 8%
+/// lower than the fit gave: the F1 his output really has stood 11% above the value asked for,
+/// and "keep" and "each" were heard with the vowel of "cape" (13 times in 400 sentences,
+/// now 2; the reader never).
 #[rustfmt::skip]
 pub const FEMALE_VOWEL_SPACE: [[f64; 3]; VOWEL_COUNT] = [
-    [1.037, 1.021, 0.968], // IY
-    [1.135, 0.950, 1.023], // IH
-    [1.180, 0.978, 1.046], // EH
-    [1.180, 0.951, 1.041], // AE
-    [1.113, 0.966, 1.050], // AA
-    [1.159, 1.082, 1.033], // AO
-    [1.089, 1.077, 1.027], // UH
-    [0.978, 1.169, 1.026], // UW
-    [1.164, 1.099, 1.084], // AH
-    [1.180, 1.090, 1.059], // AX
-    [1.039, 1.018, 1.000], // ER
-    [1.180, 1.000, 1.006], // EY
-    [1.131, 1.063, 1.031], // AY
-    [1.104, 1.019, 1.023], // OY
-    [1.154, 1.072, 1.051], // AW
-    [1.077, 1.111, 1.067], // OW
+    [1.037, 0.960, 0.852], // IY
+    [1.065, 0.925, 0.955], // IH
+    [1.180, 0.929, 0.962], // EH
+    [1.225, 0.903, 0.968], // AE
+    [1.113, 0.985, 1.015], // AA
+    [1.159, 1.082, 0.909], // AO
+    [1.024, 1.142, 1.023], // UH
+    [0.978, 1.169, 0.975], // UW
+    [1.164, 1.099, 1.025], // AH
+    [1.180, 1.090, 1.006], // AX
+    [1.039, 0.967, 0.960], // ER
+    [1.180, 0.970, 0.926], // EY
+    [1.131, 1.063, 0.949], // AY
+    [1.104, 1.019, 1.020], // OY
+    [1.154, 1.072, 1.019], // AW
+    [1.077, 1.111, 0.971], // OW
 ];
 #[rustfmt::skip]
 pub const MALE_VOWEL_SPACE: [[f64; 3]; VOWEL_COUNT] = [
-    [1.105, 0.954, 0.925], // IY
-    [1.068, 0.909, 0.975], // IH
+    [1.017, 0.954, 0.925], // IY
+    [1.032, 0.920, 0.975], // IH
     [1.057, 0.955, 0.978], // EH
-    [1.109, 0.905, 0.979], // AE
+    [1.145, 0.905, 0.979], // AE
     [1.005, 0.952, 1.002], // AA
     [1.019, 1.070, 0.988], // AO
-    [1.034, 1.002, 0.983], // UH
+    [0.972, 1.062, 1.042], // UH
     [1.044, 1.110, 0.997], // UW
     [1.048, 1.024, 0.996], // AH
     [1.056, 1.024, 0.994], // AX
@@ -207,17 +226,17 @@ impl VoiceConfig {
     pub fn male() -> VoiceConfig {
         VoiceConfig {
             gender: Gender::Male,
-            pitch_hz: 110.0,
-            tract_length_cm: 17.0,
+            pitch_hz: 98.0,
+            tract_length_cm: 17.55,
             speed: 1.0,
             warmth: 0.56,
             chest_resonance: 0.54,
-            breathiness: 0.12,
+            breathiness: 0.11,
             nasality: 0.04,
-            roughness: 0.08,
+            roughness: 0.04,
             crispness: 1.0,
-            expressiveness: 1.0,
-            vibrato: 0.12,
+            expressiveness: 1.21,
+            vibrato: 0.02,
             whisper: false,
             folds: false,
             volume: 1.0,
@@ -232,11 +251,12 @@ impl VoiceConfig {
             pauses: 1.0,
             breaths: 0.25,
             open_quotient: MALE_OPEN_QUOTIENT,
-            subglottal: 0.0,
-            room: 0.25,
+            subglottal: 0.28,
+            room: 0.52,
             pitch_coupling: 0.0,
             air: DEFAULT_AIR,
             laughter: 0.0,
+            creak: 0.5,
             closure: MALE_CLOSURE,
         }
     }
@@ -246,15 +266,17 @@ impl VoiceConfig {
     pub fn female() -> VoiceConfig {
         VoiceConfig {
             gender: Gender::Female,
-            pitch_hz: 208.0,
+            pitch_hz: 190.5,
             tract_length_cm: 14.2,
             warmth: 0.62,
             chest_resonance: 0.48,
             breathiness: 0.2,
+            roughness: 0.08,
             crispness: 1.02,
-            expressiveness: 1.06,
-            vibrato: 0.14,
+            expressiveness: 1.17,
+            vibrato: 0.03,
             open_quotient: FEMALE_OPEN_QUOTIENT,
+            subglottal: 0.34,
             closure: FEMALE_CLOSURE,
             ..VoiceConfig::male()
         }
@@ -301,6 +323,7 @@ impl VoiceConfig {
             "air" => &mut self.air,
             "closure" => &mut self.closure,
             "laughter" => &mut self.laughter,
+            "creak" => &mut self.creak,
             _ => return None,
         })
     }
@@ -344,6 +367,7 @@ impl VoiceConfig {
         self.pitch_coupling = clamp_setting(self.pitch_coupling, 0.0, 1.0);
         self.air = clamp_setting(self.air, 0.0, 1.0);
         self.laughter = clamp_setting(self.laughter, 0.0, 1.0);
+        self.creak = clamp_setting(self.creak, 0.0, 1.0);
         self.closure = clamp_setting(self.closure, 0.0, 1.0);
         self.pauses = clamp_setting(self.pauses, 0.3, 3.0);
         self.breaths = clamp_setting(self.breaths, 0.0, 1.0);
@@ -370,8 +394,10 @@ impl VoiceConfig {
 
     /// Generates a distinct, physically coherent human [`VoiceConfig`] from `seed`.
     ///
-    /// Correlates vocal-tract length with fundamental frequency, shapes a smooth speaker EQ
-    /// curve, and keeps larynx/resonance parameters inside natural conversational ranges.
+    /// A body size sets the tract length and (loosely) the pitch, the resonances and the
+    /// vowels get the speaker's own pattern, the voice quality is one of a few kinds (soft and
+    /// breathy, pressed and bright, gravelly, modal), and the speaking style its own rate,
+    /// liveliness and pauses - all inside natural conversational ranges.
     pub fn randomized(
         seed: u32,
         gender_override: Option<Gender>,
@@ -408,51 +434,111 @@ impl VoiceConfig {
         let mut cfg = VoiceConfig::for_gender(gender);
         cfg.seed = seed;
 
-        let pitch_hz = locked_pitch_hz.unwrap_or_else(|| match gender {
-            Gender::Male => (112.0 + rng.tri() * 30.0).clamp(82.0, 148.0),
-            Gender::Female => (204.0 + rng.tri() * 38.0).clamp(166.0, 248.0),
-        });
-        cfg.pitch_hz = (pitch_hz * 10.0).round() / 10.0;
+        let male = gender == Gender::Male;
+        // (to a whole number of steps, divided back so that 0.41 prints as 0.41)
+        let round = |v: f64, step: f64| {
+            let per_unit = (1.0 / step).round();
+            (v * per_unit).round() / per_unit
+        };
 
-        let base_tract = match gender {
-            Gender::Male => 17.55 - (cfg.pitch_hz - 112.0) * 0.032 + rng.tri() * 0.85,
-            Gender::Female => 14.25 - (cfg.pitch_hz - 204.0) * 0.022 + rng.tri() * 0.65,
+        // Body: one draw moves the length of the tract and the pitch together - a larger
+        // speaker has a longer tract and, more loosely, a lower voice - and each also varies on
+        // its own. The tract's length is what a listener (and a speaker-verification model)
+        // hears most as "who": a centimetre moves a voice further than any other setting.
+        let base_pitch = if male { 112.0 } else { 206.0 };
+        let mut size = rng.tri();
+        let pitch_hz = match locked_pitch_hz {
+            Some(hz) => {
+                // a voice given its pitch is built around it
+                let st = 12.0 * (hz.max(1.0) / base_pitch).log2();
+                size = (-st / 5.0).clamp(-1.0, 1.0) * 0.6 + 0.4 * size;
+                hz
+            }
+            None => {
+                let st = -2.6 * size + 3.0 * rng.tri();
+                (base_pitch * 2f64.powf(st / 12.0)).clamp(if male { 82.0 } else { 160.0 }, if male { 150.0 } else { 242.0 })
+            }
         };
-        cfg.tract_length_cm = (base_tract.clamp(
-            if gender == Gender::Female { 13.0 } else { 15.6 },
-            if gender == Gender::Female { 15.9 } else { 19.6 },
-        ) * 100.0)
-            .round()
-            / 100.0;
+        cfg.pitch_hz = round(pitch_hz, 0.1);
+        let tract = if male { 17.0 + 1.3 * size + 0.8 * rng.tri() } else { 14.2 + 0.85 * size + 0.6 * rng.tri() };
+        cfg.tract_length_cm = round(tract.clamp(if male { 15.3 } else { 13.0 }, if male { 19.0 } else { 15.5 }), 0.01);
 
-        cfg.speed = (rng.range(0.90, 1.15) * 100.0).round() / 100.0;
-        cfg.expressiveness = (rng.range(0.82, 1.34) * 100.0).round() / 100.0;
-        cfg.warmth = (rng.range(0.32, 0.80) * 100.0).round() / 100.0;
-        cfg.open_quotient = ((0.58 + (cfg.warmth - 0.32) * 0.22 + rng.tri() * 0.03).clamp(0.55, 0.72) * 100.0).round() / 100.0;
-        cfg.closure = match gender {
-            Gender::Male => (rng.range(0.42, 0.88) * 100.0).round() / 100.0,
-            Gender::Female => (rng.range(0.16, 0.54) * 100.0).round() / 100.0,
-        };
-        cfg.chest_resonance = match gender {
-            Gender::Male => (rng.range(0.28, 0.72) * 100.0).round() / 100.0,
-            Gender::Female => (rng.range(0.24, 0.58) * 100.0).round() / 100.0,
-        };
-        cfg.breathiness = (rng.range(0.05, 0.26) * 100.0).round() / 100.0;
-        cfg.roughness = if rng.u01() < 0.16 {
-            (rng.range(0.20, 0.36) * 100.0).round() / 100.0
+        // The rest of the tract's shape: each speaker's resonances stand a little apart from
+        // where the length alone puts them, the upper ones (the "speaker's formant") most.
+        let upper = 1.0 + 0.07 * rng.tri();
+        cfg.formants = [
+            round(1.0 + 0.05 * rng.tri(), 0.001),
+            round(1.0 + 0.06 * rng.tri(), 0.001),
+            round(1.0 + 0.05 * rng.tri(), 0.001),
+            round(upper, 0.001),
+            round(upper, 0.001),
+        ];
+
+        // Idiolect: where this speaker puts the vowels. A few habits shared across the vowels
+        // (how open the mouth is, how far forward "goose" and "goat" are, how front the front
+        // vowels and how back the back ones, a raised "trap") and a little of each vowel's own.
+        let openness = 0.035 * rng.tri();
+        let back_fronting = 0.08 * rng.tri();
+        let spread = 0.03 * rng.tri();
+        let tense_ae = 0.05 * rng.tri();
+        for (i, v) in VOWEL_KEYS.iter().enumerate() {
+            let mut m = [1.0 + openness + 0.02 * rng.tri(), 1.0 + 0.025 * rng.tri(), 1.0 + 0.012 * rng.tri()];
+            match v {
+                Ph::UW | Ph::UH | Ph::OW | Ph::AW => m[1] *= 1.0 + back_fronting,
+                _ => {}
+            }
+            match v {
+                Ph::IY | Ph::IH | Ph::EH | Ph::AE | Ph::EY => m[1] *= 1.0 + spread,
+                Ph::AA | Ph::AO | Ph::UW | Ph::UH | Ph::OW => m[1] *= 1.0 - spread,
+                _ => {}
+            }
+            if *v == Ph::AE {
+                m[0] *= 1.0 - tense_ae;
+                m[1] *= 1.0 + 0.6 * tense_ae;
+            }
+            cfg.vowels[i] = [round(m[0], 0.001), round(m[1], 0.001), round(m[2], 0.001)];
+        }
+
+        // Voice quality: a kind of voice, not every setting drawn on its own - that gives the
+        // middle of every range, and voices that all sound alike.
+        let kind = rng.u01();
+        let (breathy, warm, closure, open, rough) = if kind < 0.22 {
+            // soft and breathy: the folds never quite close
+            (rng.range(0.24, 0.42), rng.range(0.6, 0.8), if male { rng.range(0.4, 0.62) } else { rng.range(0.1, 0.26) }, rng.range(0.65, 0.7), rng.range(0.03, 0.1))
+        } else if kind < 0.42 {
+            // pressed and bright: a firm, ringing voice
+            (rng.range(0.02, 0.09), rng.range(0.24, 0.46), if male { rng.range(0.8, 0.98) } else { rng.range(0.42, 0.62) }, rng.range(0.57, 0.62), rng.range(0.04, 0.12))
+        } else if kind < 0.56 {
+            // gravelly: an uneven, rough voice
+            (rng.range(0.1, 0.22), rng.range(0.4, 0.7), if male { rng.range(0.55, 0.85) } else { rng.range(0.2, 0.45) }, rng.range(0.6, 0.67), rng.range(0.2, 0.34))
         } else {
-            (rng.range(0.04, 0.18) * 100.0).round() / 100.0
+            // modal
+            (rng.range(0.06, 0.2), rng.range(0.4, 0.74), if male { rng.range(0.55, 0.88) } else { rng.range(0.16, 0.42) }, rng.range(0.6, 0.68), rng.range(0.04, 0.14))
         };
-        cfg.nasality = (rng.range(0.0, 0.15) * 100.0).round() / 100.0;
-        cfg.crispness = (rng.range(0.86, 1.20) * 100.0).round() / 100.0;
-        cfg.vibrato = (rng.range(0.0, 0.18) * 100.0).round() / 100.0;
-        cfg.air = (rng.range(0.28, 0.62) * 100.0).round() / 100.0;
-        cfg.room = (rng.range(0.16, 0.38) * 100.0).round() / 100.0;
-        cfg.subglottal = (rng.range(0.0, 0.25) * 100.0).round() / 100.0;
-        cfg.pitch_coupling = (rng.range(0.0, 0.45) * 100.0).round() / 100.0;
-        cfg.bass = ((rng.tri() * 3.0) * 2.0).round() / 2.0;
-        cfg.presence = ((rng.tri() * 3.0) * 2.0).round() / 2.0;
-        cfg.brightness = ((rng.tri() * 2.5) * 2.0).round() / 2.0;
+        cfg.breathiness = round(breathy, 0.01);
+        cfg.warmth = round(warm, 0.01);
+        cfg.closure = round(closure, 0.01);
+        cfg.open_quotient = round(open, 0.01);
+        cfg.roughness = round(rough, 0.01);
+        cfg.chest_resonance = round(if male { rng.range(0.3, 0.74) } else { rng.range(0.26, 0.6) }, 0.01);
+        // most voices are hardly nasal; some are clearly so
+        cfg.nasality = round(if rng.u01() < 0.12 { rng.range(0.12, 0.22) } else { rng.range(0.0, 0.08) }, 0.01);
+        cfg.vibrato = round(rng.range(0.0, 0.16), 0.01);
+        cfg.air = round(rng.range(0.25, 0.6), 0.01);
+        cfg.subglottal = round(rng.range(0.0, 0.25), 0.01);
+        cfg.pitch_coupling = round(rng.range(0.0, 0.45), 0.01);
+        cfg.crispness = round(rng.range(0.86, 1.2), 0.01);
+        cfg.creak = round(rng.range(0.1, 0.9), 0.01);
+
+        // Speaking style: how fast, how lively, how long the pauses, how even the pace.
+        cfg.speed = round(1.01 + 0.15 * rng.tri(), 0.01);
+        cfg.expressiveness = round(1.08 + 0.32 * rng.tri(), 0.01);
+        cfg.pauses = round(1.0 + 0.25 * rng.tri(), 0.01);
+        cfg.variation = round(0.5 + 0.2 * rng.tri(), 0.01);
+        cfg.room = round(rng.range(0.16, 0.36), 0.01);
+        cfg.bass = round(rng.tri() * 3.0, 0.5);
+        cfg.presence = round(rng.tri() * 3.0, 0.5);
+        cfg.brightness = round(rng.tri() * 2.5, 0.5);
 
         // Smooth correlated 10-band speaker coloration curve
         let mut raw_eq = [0.0f64; TONE_BANDS];
@@ -463,17 +549,8 @@ impl VoiceConfig {
             let l = raw_eq[i.saturating_sub(1)];
             let c = raw_eq[i];
             let r = raw_eq[(i + 1).min(TONE_BANDS - 1)];
-            cfg.tone[i] = ((0.25 * l + 0.5 * c + 0.25 * r) * 2.0).round() / 2.0;
+            cfg.tone[i] = round(0.25 * l + 0.5 * c + 0.25 * r, 0.5);
         }
-
-        let upper_cluster = ((1.0 + rng.tri() * 0.065) * 1000.0).round() / 1000.0;
-        cfg.formants = [
-            ((1.0 + rng.tri() * 0.04) * 1000.0).round() / 1000.0,
-            ((1.0 + rng.tri() * 0.04) * 1000.0).round() / 1000.0,
-            ((1.0 + rng.tri() * 0.03) * 1000.0).round() / 1000.0,
-            upper_cluster,
-            upper_cluster,
-        ];
 
         cfg.sanitize();
         cfg
@@ -503,11 +580,11 @@ impl Default for VoiceConfig {
 }
 
 /// Names of the numeric settings, as [`VoiceConfig::number_mut`] takes them.
-pub const NUMBER_SETTINGS: [&str; 25] = [
+pub const NUMBER_SETTINGS: [&str; 26] = [
     "pitchHz", "tractLengthCm", "speed", "warmth", "chestResonance", "breathiness", "nasality", "roughness",
     "crispness", "expressiveness", "vibrato", "volume", "variation", "bass", "presence", "brightness",
     "pauses", "breaths", "openQuotient", "subglottal", "room", "pitchCoupling", "air", "closure",
-    "laughter",
+    "laughter", "creak",
 ];
 
 /// A built-in voice: one of the two plain voices with a few settings changed, so that
@@ -534,9 +611,9 @@ impl std::fmt::Debug for Preset {
     }
 }
 
-/// The built-in voices: the two plain ones, and for each a lower or higher and a rougher or
-/// softer variant.
-pub static PRESETS: [Preset; 6] = [
+/// The built-in voices: the two plain ones, and for each a few characters - lower or higher,
+/// rougher or softer, firmer or older.
+pub static PRESETS: [Preset; 10] = [
     Preset { id: "male", label: "Male", gender: Gender::Male, change: |_| {} },
     Preset {
         id: "deep",
@@ -563,6 +640,39 @@ pub static PRESETS: [Preset; 6] = [
             v.roughness = 0.34;
         },
     },
+    Preset {
+        id: "crisp",
+        label: "Crisp",
+        gender: Gender::Male,
+        change: |v| {
+            // firm and bright, every consonant in place: an announcer
+            v.pitch_hz = 118.0;
+            v.tract_length_cm = 16.6;
+            v.closure = 0.95;
+            v.breathiness = 0.06;
+            v.warmth = 0.36;
+            v.crispness = 1.18;
+            v.expressiveness = 1.18;
+            v.speed = 1.04;
+        },
+    },
+    Preset {
+        id: "elder",
+        label: "Elder",
+        gender: Gender::Male,
+        change: |v| {
+            // an older man: the voice a little higher, rougher and breathier, slower, unsteady
+            v.pitch_hz = 124.0;
+            v.tract_length_cm = 17.4;
+            v.roughness = 0.2;
+            v.breathiness = 0.28;
+            v.vibrato = 0.2;
+            v.speed = 0.9;
+            v.crispness = 0.9;
+            v.expressiveness = 0.92;
+            v.pauses = 1.2;
+        },
+    },
     Preset { id: "female", label: "Female", gender: Gender::Female, change: |_| {} },
     Preset {
         id: "bright",
@@ -574,6 +684,35 @@ pub static PRESETS: [Preset; 6] = [
             v.speed = 1.03;
             v.warmth = 0.58;
             v.expressiveness = 1.12;
+        },
+    },
+    Preset {
+        id: "soft",
+        label: "Soft",
+        gender: Gender::Female,
+        change: |v| {
+            // gentle and breathy, unhurried
+            v.pitch_hz = 192.0;
+            v.breathiness = 0.34;
+            v.warmth = 0.78;
+            v.closure = 0.15;
+            v.open_quotient = 0.68;
+            v.speed = 0.94;
+            v.expressiveness = 0.92;
+        },
+    },
+    Preset {
+        id: "mellow",
+        label: "Mellow",
+        gender: Gender::Female,
+        change: |v| {
+            // a lower, warmer speaking voice
+            v.pitch_hz = 178.0;
+            v.tract_length_cm = 14.9;
+            v.warmth = 0.72;
+            v.chest_resonance = 0.62;
+            v.speed = 0.96;
+            v.expressiveness = 0.98;
         },
     },
     Preset {

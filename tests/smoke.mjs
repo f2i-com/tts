@@ -67,9 +67,9 @@ const male = new TTS();
 const female = new TTS("female");
 assert.equal(male.gender, "male");
 assert.equal(female.settings.gender, "female");
-assert.deepEqual(TTS.presets().map((p) => p.id), ["male", "deep", "husky", "female", "bright", "whisper"]);
+assert.deepEqual(TTS.presets().map((p) => p.id), ["male", "deep", "husky", "crisp", "elder", "female", "bright", "soft", "mellow", "whisper"]);
 assert.throws(() => new TTS("no_such_voice"), /unknown voice/);
-assert.deepEqual(new TTS(TTS.presets()[3]).settings, female.settings);
+assert.deepEqual(new TTS(TTS.presets()[5]).settings, female.settings);
 assert.deepEqual(new TTS("clear_alto").settings, female.settings, "earlier preset ids still work");
 assert.throws(() => new TTS({ gender: "robot" }), /gender/);
 

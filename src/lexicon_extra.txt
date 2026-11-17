@@ -27,14 +27,14 @@ sixteenth S IH1 K S T IY2 N TH
 seventeenth S EH1 V AX N T IY2 N TH
 eighteenth EY1 T IY2 N TH
 nineteenth N AY1 N T IY2 N TH
-twentieth T W EH1 N T IY0 AX TH
-thirtieth TH ER1 T IY0 AX TH
-fortieth F AO1 R T IY0 AX TH
-fiftieth F IH1 F T IY0 AX TH
-sixtieth S IH1 K S T IY0 AX TH
-seventieth S EH1 V AX N T IY0 AX TH
-eightieth EY1 T IY0 AX TH
-ninetieth N AY1 N T IY0 AX TH
+twentieth T W EH1 N T IY0 IH0 TH
+thirtieth TH ER1 T IY0 IH0 TH
+fortieth F AO1 R T IY0 IH0 TH
+fiftieth F IH1 F T IY0 IH0 TH
+sixtieth S IH1 K S T IY0 IH0 TH
+seventieth S EH1 V AX N T IY0 IH0 TH
+eightieth EY1 T IY0 IH0 TH
+ninetieth N AY1 N T IY0 IH0 TH
 hundredth HH AH1 N D R AX D TH
 thousandth TH AW1 Z AX N TH
 millionth M IH1 L Y AX N TH
@@ -121,3 +121,100 @@ username Y UW1 Z ER N EY2 M
 website W EH1 B S AY2 T
 online AA1 N L AY2 N
 email IY1 M EY2 L
+
+# --- conversation, slang and newer words the dictionary lacks or reads wrongly ---
+# (checked by ear for an English speaker; the letter rules turn most of these into
+# something else: "hiya" into "hee-ee-uh", "g'day" into "gee day", "outta" into "oota")
+hiya HH AY1 Y AX
+heya HH EY1 Y AX
+hullo HH AX L OW1
+wassup W AX S AH1 P
+whassup W AX S AH1 P
+g'day G AX D EY1
+gday G AX D EY1
+cya S IY1 Y AX
+byee B AY1
+hola OW1 L AA
+aight AY1 T
+ya Y AX
+ow AW1
+ew IY1 UW
+eww IY1 UW
+aww AO1
+haha HH AA2 HH AA1
+hahaha HH AA2 HH AA2 HH AA1
+hehe HH IY2 HH IY1
+heh HH EH1
+omg OW2 EH2 M JH IY1
+idk AY2 D IY2 K EY1
+lmao EH2 L EH2 M EY2 OW1
+imo AY2 EH2 M OW1
+pls P L IY1 Z
+plz P L IY1 Z
+thx TH AE1 NG K S
+tmrw T AX M AA1 R OW2
+cuz K AH1 Z
+'cause K AX Z
+'em AX M
+y'know Y AX N OW1
+c'mon K AX M AA1 N
+d'you D Y AX
+tryna T R AY1 N AX
+outta AW1 T AX
+shoulda SH UH1 D AX
+coulda K UH1 D AX
+woulda W UH1 D AX
+whatcha W AH1 CH AX
+whaddya W AH1 D Y AX
+dontcha D OW1 N CH AX
+homie HH OW1 M IY
+homies HH OW1 M IY Z
+ai EY2 AY1
+gui G UW1 IY
+ios AY2 OW2 EH1 S
+macos M AE1 K OW2 EH1 S
+ux Y UW2 EH1 K S
+cli S IY2 EH2 L AY1
+gpu JH IY2 P IY2 Y UW1
+emojis IH M OW1 JH IY Z
+memes M IY1 M Z
+livestream L AY1 V S T R IY2 M
+livestreams L AY1 V S T R IY2 M Z
+livestreaming L AY1 V S T R IY2 M IH NG
+tiktok T IH1 K T AA2 K
+logout L AO1 G AW2 T
+emails IY1 M EY2 L Z
+chatbot CH AE1 T B AA2 T
+chatbots CH AE1 T B AA2 T S
+typescript T AY1 P S K R IH2 P T
+ubuntu UW B UH1 N T UW
+airbnb EH1 R B IY2 EH2 N B IY2
+bitcoin B IH1 T K OY2 N
+chatgpt CH AE1 T JH IY2 P IY2 T IY1
+webassembly W EH1 B AX S EH2 M B L IY
+sunnies S AH1 N IY Z
+bogan B OW1 G AX N
+bogans B OW1 G AX N Z
+footy F UH1 T IY
+bikkie B IH1 K IY
+bikkies B IH1 K IY Z
+galah G AX L AA1
+galahs G AX L AA1 Z
+brisbane B R IH1 Z B AX N
+canberra K AE1 N B R AX
+acai AA2 S AA IY1
+pho F AH1
+jalapeno HH AA2 L AX P EY1 N Y OW
+jalapenos HH AA2 L AX P EY1 N Y OW Z
+edamame EH2 D AX M AA1 M EY
+kombucha K AA M B UW1 CH AX
+tzatziki Z AA Z IY1 K IY
+ramen R AA1 M AX N
+poutine P UW T IY1 N
+mochi M OW1 CH IY
+niamh N IY1 V
+saoirse S ER1 SH AX
+aoife IY1 F AX
+aiden EY1 D AX N
+nguyen W IH1 N
+aaliyah AA L IY1 AX

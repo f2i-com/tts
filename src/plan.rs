@@ -81,12 +81,12 @@ impl Plan {
 /// as those of "the" and "of" - 0.71 of a content word's - and none of them is normally
 /// accented: "*he* would *have* gone" with a pitch movement on every word is what a machine
 /// reading a word list sounds like. (Negatives - "not", "don't", "can't" - are not weak.)
-const FUNCTION_WORDS: [&str; 89] = [
+const FUNCTION_WORDS: [&str; 91] = [
     "a", "an", "the", "to", "of", "in", "on", "at", "for", "by", "with", "and", "or", "but", "if",
     "as", "is", "am", "are", "was", "were", "be", "it", "its", "my", "your", "his", "her", "our",
     "their", "that", "from", "than", "them", "can",
-    // personal pronouns
-    "i", "he", "she", "we", "you", "they", "me", "him", "us",
+    // personal pronouns (and the casual "ya" and "'em")
+    "i", "he", "she", "we", "you", "they", "me", "him", "us", "ya", "'em",
     // auxiliaries and modals
     "have", "has", "had", "do", "does", "did", "will", "would", "could", "should", "shall", "may",
     "might", "must", "been", "being",
@@ -110,7 +110,7 @@ const LIGHT_WORDS: [&str; 44] = [
 
 /// Personal pronouns: at the very end of a phrase they keep their full form but do not take
 /// the phrase's main accent ("I *saw* him.", "*Look* at it.").
-const PRONOUNS: [&str; 13] = ["i", "he", "she", "we", "you", "they", "me", "him", "her", "us", "them", "it", "one"];
+const PRONOUNS: [&str; 15] = ["i", "he", "she", "we", "you", "they", "me", "him", "her", "us", "them", "it", "one", "ya", "'em"];
 
 /// After "there", these make it the empty subject of "there is" rather than a place.
 const BE_AND_MODALS: [&str; 16] = [
@@ -147,7 +147,7 @@ fn word_weight(w: &str, wi: usize, count: usize, next: Option<&str>, is_question
 /// lists them - their vowel shrinks to a schwa ("and" -> "'nd", "for" -> "fer", "can" -> "c'n").
 /// Saying the full form every time is one of the things that makes a voice sound like it is
 /// reading a word list. Only used when the word is not the last one before a pause.
-fn weak_form(word: &str, next_starts_vowel: bool) -> Option<Vec<Phone>> {
+fn weak_form(word: &str, next_starts_vowel: bool, is_clause_initial: bool) -> Option<Vec<Phone>> {
     let p = |list: &[Ph]| Some(list.iter().map(|&x| ph(x)).collect());
     match word {
         "the" => p(&[Ph::DH, if next_starts_vowel { Ph::IY } else { Ph::AX }]),
@@ -156,16 +156,16 @@ fn weak_form(word: &str, next_starts_vowel: bool) -> Option<Vec<Phone>> {
         "to" => p(&[Ph::T, if next_starts_vowel { Ph::UW } else { Ph::AX }]),
         "of" => p(&[Ph::AX, Ph::V]),
         "and" => p(&[Ph::AX, Ph::N, Ph::D]),
-        "for" => p(&[Ph::F, Ph::ER]),
+        "for" => p(&[Ph::F, Ph::AO, Ph::R]),
         "at" => p(&[Ph::AX, Ph::T]),
         "from" => p(&[Ph::F, Ph::R, Ph::AX, Ph::M]),
         "as" => p(&[Ph::AX, Ph::Z]),
         "or" => p(&[Ph::ER]),
-        "are" => p(&[Ph::ER]),
+        "are" => p(if is_clause_initial { &[Ph::AA, Ph::R] } else { &[Ph::ER] }),
         "was" => p(&[Ph::W, Ph::AX, Ph::Z]),
         "were" => p(&[Ph::W, Ph::ER]),
-        "can" => p(&[Ph::K, Ph::AX, Ph::N]),
-        "your" => p(&[Ph::Y, Ph::ER]),
+        "can" => p(if is_clause_initial { &[Ph::K, Ph::AE, Ph::N] } else { &[Ph::K, Ph::AX, Ph::N] }),
+        "your" | "you're" => p(&[Ph::Y, Ph::ER]),
         "but" => p(&[Ph::B, Ph::AX, Ph::T]),
         "than" => p(&[Ph::DH, Ph::AX, Ph::N]),
         "them" => p(&[Ph::DH, Ph::AX, Ph::M]),
@@ -482,7 +482,7 @@ pub fn build_plan(raw_text: &str, lex: &Lexicon) -> Plan {
             if is_non_final {
                 let next_starts_vowel = expanded[wi + 1].1.first().is_some_and(|p| p.ph.is_vowel());
                 if !lex.is_user_word(w) {
-                    if let Some(weak) = weak_form(w, next_starts_vowel) {
+                    if let Some(weak) = weak_form(w, next_starts_vowel, wi == 0) {
                         phones = weak;
                     }
                 }
@@ -554,6 +554,27 @@ mod tests {
         assert!(arpabet("we live here").contains("L IH1 V"));
         assert!(arpabet("to separate them").ends_with("EY2 T | DH EH1 M"), "{}", arpabet("to separate them"));
         assert!(arpabet("a separate room").contains("AX0 T | R UW1 M"), "{}", arpabet("a separate room"));
+    }
+
+    #[test]
+    fn casual_words_and_drawn_out_spellings() {
+        // greetings and talk that the dictionary lacks
+        assert_eq!(arpabet("hiya"), "HH AY1 Y AX0");
+        assert_eq!(arpabet("G'day mate"), "G AX0 D EY1 | M EY1 T");
+        assert_eq!(arpabet("let's get outta here"), "L EH1 T S | G EH1 T | AW1 T AX0 | HH IH1 R");
+        assert!(arpabet("c'mon y'know").starts_with("K AX0 M AA1 N | Y AX0 N OW1"), "{}", arpabet("c'mon y'know"));
+        // a letter drawn out in writing is the same word
+        for (drawn, word) in [("sooo", "so"), ("yeahhh", "yeah"), ("goood", "good"), ("pleeease", "please"), ("okayyy", "okay"), ("lolll", "lol")] {
+            assert_eq!(arpabet(drawn), arpabet(word), "{drawn}");
+        }
+        // ... but "www" is still three letters
+        assert_eq!(arpabet("www").matches("D AH").count(), 3);
+        // "see ya": the accent goes to "see", as with "see you"
+        let lex = Lexicon::new();
+        let plan = build_plan("See ya.", &lex);
+        let words = &plan.clauses[0].words;
+        assert_eq!(words[1].text, "ya");
+        assert!(words[0].weight == Weight::Content && words[1].weight != Weight::Content);
     }
 
     #[test]
