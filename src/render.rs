@@ -31,6 +31,13 @@ const SUBSTEP_SAMPLES: usize = 30;
 #[allow(clippy::approx_constant)]
 const HIGH_PASS_Q: f64 = 0.7071;
 const UG_SIZE: usize = 4096;
+/// The widths of the second and third resonances as multiples of what the frames ask for
+/// (see where the renderer applies them). Sung frames are made wider by the same factors, so
+/// that singing keeps the resonances it was tuned with.
+pub(crate) fn formant_sharpness(female: bool) -> (f64, f64) {
+    (crate::tune("bw2", if female { 1.0 } else { 0.7 }), crate::tune("bw3", if female { 0.6 } else { 0.55 }))
+}
+
 /// Level of the voice bar (voicing heard through a closed mouth), about 17 dB below vowels.
 const VOICE_BAR_MIX: f64 = 0.06;
 const UG_MASK: usize = UG_SIZE - 1;
@@ -1162,6 +1169,12 @@ impl Renderer {
         // it rises - the upper bands of a real voice gain 1.2-1.4 dB per dB of level)
         let pitch_warm = crate::tune("pitch_warm", -0.03);
         let stress_warm = crate::tune("stress_warm", 1.0);
+        // How sharply the tract rings: the widths of the first three resonances, as multiples
+        // of what the phone tables give. The second and third are narrower than the tables'
+        // textbook values - in every sound, not only the vowels - and more so in a man's
+        // longer tract: with them the upper formants stand out of the spectrum as far as a
+        // real voice's do (the measure is tools/eval.py; a narrower first one only hurts).
+        let (bw2, bw3) = formant_sharpness(self.is_female);
         let asp_a1 = crate::tune("asp_a1", 0.78);
         let asp_a2 = crate::tune("asp_a2", 0.68);
         let asp_gain = crate::tune("asp_gain", 2.35);
@@ -1318,8 +1331,8 @@ impl Renderer {
                 let mut f2 = lerp(f_cur.f2, f_next.f2);
                 let mut f3 = lerp(f_cur.f3, f_next.f3);
                 let mut b1 = lerp(f_cur.b1, f_next.b1);
-                let b2 = lerp(f_cur.b2, f_next.b2);
-                let b3 = lerp(f_cur.b3, f_next.b3);
+                let b2 = lerp(f_cur.b2, f_next.b2) * bw2;
+                let b3 = lerp(f_cur.b3, f_next.b3) * bw3;
                 let fnz = lerp(f_cur.fnz, f_next.fnz);
                 let av = lerp(f_cur.av, f_next.av);
                 let ah = lerp(f_cur.ah, f_next.ah);

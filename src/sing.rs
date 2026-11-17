@@ -1661,6 +1661,7 @@ fn rasterize_singing_frames(
     let female_glottal_damp = if female { 34.0 } else { 0.0 };
     let female_b2_damp = if female { 16.0 } else { 0.0 };
     let female_b3_damp = if female { 10.0 } else { 0.0 };
+    let sharp = crate::render::formant_sharpness(female);
     let b1_wall = if female { 0.0 } else { 14.0 };
 
     let mut frames = Vec::new();
@@ -1740,8 +1741,9 @@ fn rasterize_singing_frames(
                     + open_damp
                     + prox_damp
                     + female_glottal_damp,
-                b2: mix(s.b2, |e| e.b2) * (1.0 + breathiness * 0.14) + prox_damp * 0.75 + female_b2_damp,
-                b3: mix(s.b3, |e| e.b3) * (1.0 + breathiness * 0.10) + female_b3_damp,
+                // (the renderer narrows these two for speech; a sung vowel keeps its own)
+                b2: (mix(s.b2, |e| e.b2) * (1.0 + breathiness * 0.14) + prox_damp * 0.75 + female_b2_damp) / sharp.0,
+                b3: (mix(s.b3, |e| e.b3) * (1.0 + breathiness * 0.10) + female_b3_damp) / sharp.1,
                 av: if whisper { 0.0 } else { seg_av },
                 ah: if whisper {
                     seg_ah.max(seg_av * 0.65)

@@ -380,7 +380,18 @@ const told = straight.speak(joke);
 const laughed = amused.speak(joke);
 assert.deepEqual(laughed.words.map((x) => x.word), told.words.map((x) => x.word));
 assert.ok(laughed.duration > told.duration + 0.4, `${laughed.duration} vs ${told.duration}`);
-assert.ok(medianPitch(laughed) > medianPitch(told) * 1.03, `${medianPitch(laughed)} vs ${medianPitch(told)}`);
+// (the median pitch of the voiced frames, from the acoustics that come with every utterance)
+const voicedMedianF0 = (speech) => {
+  const n = speech.acousticFields.length;
+  const [iF0, iV] = [speech.acousticFields.indexOf("f0"), speech.acousticFields.indexOf("voicing")];
+  const f0 = [];
+  for (let k = 0; k * n < speech.acoustics.length; k++) {
+    if (speech.acoustics[k * n + iV] > 0.4) f0.push(speech.acoustics[k * n + iF0]);
+  }
+  f0.sort((a, b) => a - b);
+  return f0[f0.length >> 1];
+};
+assert.ok(voicedMedianF0(laughed) > voicedMedianF0(told) * 1.03, `${voicedMedianF0(laughed)} vs ${voicedMedianF0(told)}`);
 const scene = straight.speakScript("[laughing] You should have seen his face! [/laughing] Anyway.");
 assert.equal(scene.segments.length, 2);
 assert.ok(scene.words.every((x) => !x.word.startsWith("[")));

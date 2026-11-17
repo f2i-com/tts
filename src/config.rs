@@ -31,7 +31,7 @@ pub struct VoiceConfig {
     pub gender: Gender,
     /// Average speaking pitch in Hz (male ≈ 85–140, female ≈ 165–250).
     pub pitch_hz: f64,
-    /// Vocal-tract length in cm; shorter tracts raise every formant (male ≈ 17.5, female ≈ 14).
+    /// Vocal-tract length in cm; shorter tracts raise every formant (male ≈ 17, female ≈ 14.2).
     pub tract_length_cm: f64,
     /// Speaking-rate multiplier (1.0 = natural).
     pub speed: f64,
@@ -208,7 +208,7 @@ impl VoiceConfig {
         VoiceConfig {
             gender: Gender::Male,
             pitch_hz: 110.0,
-            tract_length_cm: 17.5,
+            tract_length_cm: 17.0,
             speed: 1.0,
             warmth: 0.56,
             chest_resonance: 0.54,
@@ -247,7 +247,7 @@ impl VoiceConfig {
         VoiceConfig {
             gender: Gender::Female,
             pitch_hz: 208.0,
-            tract_length_cm: 13.9,
+            tract_length_cm: 14.2,
             warmth: 0.62,
             chest_resonance: 0.48,
             breathiness: 0.2,

@@ -688,7 +688,8 @@ mod tests {
             all.extend_from_slice(&buf[..n]);
         }
         let peak = all.iter().fold(0.0f32, |m, v| m.max(v.abs()));
-        assert!(peak > 0.5 && peak < 0.97, "peak {peak}");
+        // (rounded off by the limiter, well short of full scale)
+        assert!(peak > 0.5 && peak < 0.99, "peak {peak}");
         // once the gain has come down, the stream is at the level the one-shot rendering has
         let offline = Synth::new(VoiceConfig::male()).speak(&text);
         let tail_peak = |x: &[f32]| x[x.len() - 3 * SAMPLE_RATE as usize..].iter().fold(0.0f32, |m, v| m.max(v.abs()));
@@ -1252,12 +1253,14 @@ mod tests {
         let ih_f2: Vec<f64> = kick.frames.iter().filter(|f| f.phone == Ph::IH).map(|f| f.f2).collect();
         assert!(ih_f2[ih_f2.len() - 1] > 1950.0, "coda /k/ keeps front F2: {ih_f2:?}");
 
-        // Clear onset [l] ("glue") stays higher in F2 than dark coda [ɫ] ("bowls").
+        // The /l/ before a vowel ("glue") is a little higher in F2 than the coda [ɫ]
+        // ("bowls"), and both are dark, as American speakers have them (not the clear [l]
+        // of 1400 Hz).
         let glue = synth.speak("glue");
         let bowls = synth.speak("bowls");
         let ons_l_f2 = mean(glue.frames.iter().filter(|f| f.phone == Ph::L).map(|f| f.f2));
         let coda_l_f2 = mean(bowls.frames.iter().filter(|f| f.phone == Ph::L).map(|f| f.f2));
-        assert!(ons_l_f2 > coda_l_f2 + 250.0, "clear [l] {ons_l_f2} vs dark [ɫ] {coda_l_f2}");
+        assert!(ons_l_f2 > coda_l_f2 + 50.0 && ons_l_f2 < 1250.0, "onset [l] {ons_l_f2} vs coda [ɫ] {coda_l_f2}");
     }
 
     #[test]

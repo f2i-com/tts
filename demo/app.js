@@ -160,10 +160,10 @@ const PROFILES = [
 ];
 
 const PRESET_META = {
-  male: ["110 Hz", "17.5 cm"],
+  male: ["110 Hz", "17.0 cm"],
   deep: ["86 Hz", "18.8 cm"],
   husky: ["106 Hz", "raspy"],
-  female: ["208 Hz", "13.9 cm"],
+  female: ["208 Hz", "14.2 cm"],
   bright: ["222 Hz", "lively"],
   whisper: ["no voicing"],
 };
@@ -1659,7 +1659,7 @@ function drawExpressiveFace(ctx, x0, y0, boxW, boxH, nowMs) {
 
   const activeGender = anim.activeGender || stickySegment?.gender || voice?.settings.gender;
   const isFem = activeGender === "female";
-  const tract = anim.activeTract ?? stickySegment?.tractLengthCm ?? voice?.settings.tractLengthCm ?? (isFem ? 13.9 : 17.5);
+  const tract = anim.activeTract ?? stickySegment?.tractLengthCm ?? voice?.settings.tractLengthCm ?? (isFem ? 14.2 : 17.0);
   const sizeNorm = Math.max(-1, Math.min(1, (tract - 15.6) / 2.6)); // -1 compact .. +1 deep
   const isWhispering = (anim.voicing < 0.05 && anim.noise > 0.08) || Boolean(voice?.settings.whisper);
 

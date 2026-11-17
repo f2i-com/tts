@@ -288,6 +288,7 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
     // (the female /h/ was too faint against her vowels: sentences full of "he", "her", "had"
     // were the ones a listening model marked down most)
     let h_noise = tune("h_noise", if female { 1.4 } else { 1.0 });
+    let zv_bar = tune("zv_bar", 1.0);
     // How breathy the very end of a phrase gets.
     let tail_lax = tune("tail_lax", 0.42);
     // Creak at the end of a phrase (development hooks: how strong, and from which point of
@@ -383,6 +384,7 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
             let mut seg_av = s.av;
             let mut seg_ah = s.ah;
             let mut seg_af = s.af;
+            let mut seg_avb = s.avb;
             let mut lax_extra = 0.0;
             let mut creak = 0.0;
 
@@ -427,10 +429,21 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
                 seg_af *= f_env;
                 if seg.voiced_part < 1.0 {
                     // the voice dies away over 30% of the sound around the given point
-                    seg_av *= clamp((seg.voiced_part + 0.15 - u) / 0.30, 0.0, 1.0);
+                    let fade = clamp((seg.voiced_part + 0.15 - u) / 0.30, 0.0, 1.0);
+                    seg_av *= fade;
+                    // (... and with it what of the voice comes through the closed-off mouth)
+                    seg_avb *= 1.0 - zv_bar * (1.0 - fade);
                 }
             } else if seg.phone == Ph::SIL && s.ah > 0.01 {
                 seg_ah = s.ah * (PI * u).sin();
+            }
+
+            if seg.late_voice > 0.0 {
+                let on = clamp((u - seg.late_voice) / (1.0 - seg.late_voice).max(0.05) * 1.6, 0.0, 1.0);
+                seg_av *= on;
+                seg_avb *= on;
+                seg_af *= on;
+                seg_ah *= on;
             }
 
             let mut seg_nasal = s.nasal;
@@ -442,7 +455,7 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
 
             let micro_decay = seg.micro_f0 * (-u * 2.6).exp();
             let est_energy = clamp(
-                seg_av * 0.88 + seg_af * 0.58 + seg_ah * 0.42 + s.avb * 0.35,
+                seg_av * 0.88 + seg_af * 0.58 + seg_ah * 0.42 + seg_avb * 0.35,
                 0.0,
                 1.0,
             );
@@ -470,7 +483,7 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
                     seg_ah + seg_av * breathiness * 0.16
                 },
                 af: seg_af,
-                avb: if whisper { 0.0 } else { s.avb },
+                avb: if whisper { 0.0 } else { seg_avb },
                 nasal: if whisper { 0.0 } else { seg_nasal },
                 oral_seal: s.oral_seal,
                 fnz: s.fnz * f1_scale,

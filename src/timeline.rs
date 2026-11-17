@@ -43,6 +43,9 @@ pub struct Seg {
     /// Part of the sound (from its start) through which the vocal folds keep vibrating;
     /// 1 = all of it. English /z v/ lose their voice toward a pause or a voiceless sound.
     pub voiced_part: f64,
+    /// Part of the sound (from its start) that is a silent closure before the voice sets
+    /// in; 0 = none. The "th" of "the" after a pause or a consonant is made like that.
+    pub late_voice: f64,
     /// Pitch offset of the whole sound (log units): close vowels sit a little higher.
     pub intrinsic_f0: f64,
     /// For /h/: how much voicing carries through it (0 = a voiceless [h], as after a pause;
@@ -74,6 +77,7 @@ impl Seg {
             clause_idx: 0,
             onset_devoice: false,
             voiced_part: 1.0,
+            late_voice: 0.0,
             intrinsic_f0: 0.0,
             breathy_h: 0.0,
             glide: None,
@@ -863,14 +867,32 @@ pub fn build_timeline(plan: &Plan, cfg: &VoiceConfig) -> Timeline {
                 seg.s.av *= tune("nasal_level", 1.41);
             }
             if base == Ph::HH && (prev_base.is_vowel() || matches!(prev_base, Ph::L | Ph::R | Ph::W | Ph::Y | Ph::M | Ph::N | Ph::NG)) {
-                // between voiced sounds the folds keep vibrating through an /h/
-                seg.breathy_h = tune("h_voice", 0.0);
+                // Between voiced sounds the folds keep vibrating through an /h/: in recordings
+                // its low band is within 5 dB of the vowels around it. (A man's; in the
+                // higher voice the breath is already most of the sound.)
+                seg.breathy_h = tune("h_voice", if cfg.gender == crate::config::Gender::Female { 0.0 } else { 0.5 });
             }
             if let Some(vi) = crate::config::vowel_index(base) {
                 let m = cfg.vowel_shape(vi);
                 seg.s.f1 *= m[0];
                 seg.s.f2 *= m[1];
                 seg.s.f3 *= m[2];
+            }
+            // "too", "do", "new", "you", "soon": after a sound made with the front of the
+            // tongue the tongue body is still forward when /u/ begins, and it takes most of
+            // the vowel to travel back. In two readers F2 is 60% above the vowel's own a
+            // quarter of the way in (1840 Hz in a man's voice) and still 25% above it at the
+            // middle; with the glide the recogniser misses fewer of these words. (Where F2
+            // starts, as a multiple of the vowel's own, for the glide's usual timing.)
+            if base == Ph::UW
+                && matches!(prev_base, Ph::T | Ph::D | Ph::N | Ph::S | Ph::Z | Ph::SH | Ph::ZH | Ph::CH | Ph::JH | Ph::Y | Ph::TH | Ph::DH)
+            {
+                let start = tune("uw_start", 1.35);
+                if start > 1.0 {
+                    let end = seg.s;
+                    seg.s.f2 *= start;
+                    seg.glide = Some(end);
+                }
             }
             seg.s.dur = model_ms.max(22.0);
             seg.stress = item.stress;
@@ -890,10 +912,36 @@ pub fn build_timeline(plan: &Plan, cfg: &VoiceConfig) -> Timeline {
                     seg.voiced_part = tune("zv_final", 0.25);
                 } else if next_voiceless {
                     seg.voiced_part = tune("zv_voiceless", 0.5);
+                } else if matches!(base, Ph::Z | Ph::ZH) && !next_base.is_vowel() {
+                    // ... and /z/ before any other consonant: in two readers its low band
+                    // is 35 dB down from the middle of the sound on
+                    seg.voiced_part = tune("zv_cons", 0.6);
                 }
             }
+            if base == Ph::DH {
+                let after_voiced = prev_base.is_vowel() || matches!(prev_base, Ph::L | Ph::R | Ph::W | Ph::Y | Ph::M | Ph::N | Ph::NG);
+                if !after_voiced {
+                    // After a pause or a consonant the "th" of "the", "that", "this" is not a
+                    // buzzing fricative but a soft stop: two readers are silent for the
+                    // first 60% of it (40 dB under their vowels), and the voice sets in
+                    // only as the tongue leaves the teeth.
+                    seg.late_voice = tune("dh_late", 0.6);
+                }
+            }
+            if base == Ph::V {
+                // (two readers' /v/ has 10 to 14 dB less hiss above 4 kHz than the table's,
+                // and their /f/ 6 to 12 dB less; neither judge hears the difference, so they
+                // are moved part of the way)
+                seg.s.af *= tune("v_af", 0.5);
+            }
+            if base == Ph::F {
+                seg.s.af *= tune("f_af", 0.75);
+            }
 
-            // Dark coda [ɫ] ("male", "will", "bowls") vs clear prevocalic [l] ("lazy", "blue")
+            // The coda [ɫ] ("male", "will", "bowls") and the /l/ before a vowel ("lazy",
+            // "blue"). American English keeps both dark: at the middle of an /l/ before a
+            // vowel two readers have F2 at 960 and 1230 Hz (a man and a woman; 920 and 1190
+            // in the coda), not the 1400 of a clear European [l].
             if base == Ph::L {
                 if !next_base.is_vowel() {
                     let (v_prev_l, _) = coarticulated_specs(&flat, i, cfg);
@@ -902,9 +950,9 @@ pub fn build_timeline(plan: &Plan, cfg: &VoiceConfig) -> Timeline {
                     seg.s.f2 = 880.0 * (1.0 - l_co) + clamp(v_prev_l.f2 * 0.72, 820.0, 1180.0) * l_co;
                     seg.s.f3 = tune("l_coda_f3", 2800.0);
                 } else {
-                    seg.s.f1 = tune("l_ons_f1", 345.0);
-                    seg.s.f2 = tune("l_ons_f2", 1380.0);
-                    seg.s.f3 = tune("l_ons_f3", 2700.0);
+                    seg.s.f1 = tune("l_ons_f1", 395.0);
+                    seg.s.f2 = tune("l_ons_f2", 1020.0);
+                    seg.s.f3 = tune("l_ons_f3", 2860.0);
                 }
                 let l_default = if cfg.gender == crate::config::Gender::Female { 1.06 } else { 1.0 };
                 seg.s.av *= tune("l_av", l_default);
