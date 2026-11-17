@@ -8,49 +8,53 @@ const PROMPTS_SPEECH = [
     "Hello! This voice is computed entirely in your browser from a physical model of the human vocal tract. Please pass a little water and butter — it can read numbers like 2026 or $5.99, ask rising questions, and switch between male and female speakers. Isn't that interesting?",
   ],
   [
-    "Questions & Inflection",
+    "Questions",
     "Did you see the new bridge they built last year? Where did they put the keys? Honestly, I can't believe how natural that sounded, can you?",
   ],
   [
-    "Connected Speech",
+    "Connected",
     "A little water and fresh butter make the batter much better than before. Kick the ball straight, and make sure Gregson sees the chicken.",
   ],
   [
-    "Lists & Pauses",
+    "Lists",
     "We need eggs, flour, butter, sugar, and a little milk. First open the box, then read the note, and finally call me back.",
   ],
   [
-    "Numbers & Notation",
+    "Numbers",
     "At 10:30 AM on 2026-11-16, the 16 GB module cost €5.50 — about 3/4 of Dr. Smith's estimate on Elm St.",
   ],
   [
-    "Storyteller",
+    "Story",
     "When the rain finally stopped, the children ran outside to play in the puddles along the road. What a lovely evening it had been!",
   ],
 ];
 
 const PROMPTS_SCRIPT = [
   [
-    "Male ↔ Female Dialogue",
+    "Laughs and sounds",
+    `[female, cheerful] You will never guess what happened at the meeting. [giggle]\n[deep, calm] [hmm] Go on.\n[female] The projector fell off the table, [gasp] and everyone just carried on talking! [laugh]\n[female, laughing] And then he tried to pick it up, and dropped it again!\n[deep] [chuckle] Of course he did. [sigh=1.2s] Mondays.\n[female, whisper] [shh] Here he comes.`,
+  ],
+  [
+    "Two speakers",
     `[female, cheerful, speed=1.06] Hey! Have you heard how natural this vocal tract sounds now?\n[male, calm, speed=0.96] I just listened — no neural networks or audio samples at all?\n[bright, excited, speed=1.15] Zero! Every consonant, breath, and pitch rise is pure physics in WebAssembly.\n[pause=240ms]\n[deep, serious, speed=0.92] Wait... [whisper, softer] can an AI change my voice and speed mid-sentence too?\n[female, happy] It just did!`,
   ],
   [
-    "Speed, Pitch & Emotion Arcs",
+    "Pace and emotion",
     `[woman_a, calm, speed=0.86] We can start slowly, warmly, and gently, taking our time on every word. [inhale] [excited, speed=1.22, pitch=+2st] Then suddenly speed right up with bright energy when something thrilling happens! [pause=280ms] [whisper, slow] Or drop to an intimate whisper... [woman_a, reset] before returning smoothly to normal.`,
   ],
   [
-    "4-Speaker Roundtable",
+    "Roundtable",
     `[woman_a] Welcome back to our studio roundtable! Let's check in with everyone.\n[man_a, speed=1.08] Everything on the WebAssembly build is running over 400 times real-time.\n[woman_b, calm] And speaker profiles are just a handful of physical numbers — zero megabytes of weights.\n[man_b, serious] Ready to ship anywhere a browser runs.`,
   ],
   [
-    "Dialogue → Breaks Into Song!",
+    "Breaks into song",
     `[male] Wait a second — can a rule-based vocal tract actually sing a melody?\n[female, happy] Watch the vocal folds and jaw track the notes!\n[soprano, sing bpm=112] C5:1=Shine D5:1=on E5:1.5=bright C5:0.5=star | G4:1=guide A4:1=us C5:2=home [/sing]\n[deep, excited] Okay, that was genuinely impressive!`,
   ],
 ];
 
 const PROMPTS_SING = [
   {
-    title: "Twinkle Little Star (Your Voice)",
+    title: "Twinkle",
     view: "solo",
     bpm: 108,
     transpose: 0,
@@ -58,7 +62,7 @@ const PROMPTS_SING = [
     soloLyrics: "Twinkle twinkle little star how I wonder what you are",
   },
   {
-    title: "Solo Aria · Melisma ~ (Your Voice)",
+    title: "Aria",
     view: "solo",
     bpm: 96,
     transpose: 0,
@@ -66,7 +70,7 @@ const PROMPTS_SING = [
     soloLyrics: "Sing out ~ with pure joy | let the voice ring | far a- ~ cross ~ ~ | all the star-light",
   },
   {
-    title: "4-Part Chorus: Shine On",
+    title: "Four-part chorus",
     view: "chorus",
     bpm: 102,
     transpose: 0,
@@ -79,7 +83,7 @@ const PROMPTS_SING = [
     ],
   },
   {
-    title: "Auld Lang Syne (Quartet)",
+    title: "Quartet",
     view: "chorus",
     bpm: 96,
     transpose: 0,
@@ -94,19 +98,19 @@ const PROMPTS_SING = [
 ];
 
 const SINGER_VOICE_OPTIONS = [
-  ["current", "★ Your Voice (Studio)"],
+  ["current", "Your voice"],
   ["soprano", "Soprano"],
-  ["alto", "Alto / Mezzo"],
-  ["bright", "Bright (F)"],
+  ["alto", "Alto"],
+  ["bright", "Bright"],
   ["female", "Female"],
-  ["woman_a", "US Woman A"],
-  ["woman_b", "US Woman B"],
+  ["woman_a", "US woman A"],
+  ["woman_b", "US woman B"],
   ["tenor", "Tenor"],
   ["baritone", "Baritone"],
   ["male", "Male"],
-  ["deep", "Deep Bass"],
-  ["man_a", "US Man A"],
-  ["man_b", "US Man B"],
+  ["deep", "Deep bass"],
+  ["man_a", "US man A"],
+  ["man_b", "US man B"],
 ];
 
 const SLIDERS_ESSENTIALS = [
@@ -117,50 +121,81 @@ const SLIDERS_ESSENTIALS = [
   ["warmth", "Warmth", 0, 1, 0.01, ""],
   ["breathiness", "Breathiness", 0, 0.85, 0.01, ""],
   ["crispness", "Consonant crispness", 0.45, 1.6, 0.01, ""],
-  ["variation", "Human unevenness", 0, 1, 0.01, ""],
+  ["variation", "Unevenness", 0, 1, 0.01, ""],
   ["pauses", "Pause length", 0.3, 3, 0.05, "×"],
   ["breaths", "Sentence breaths", 0, 1, 0.01, ""],
   ["room", "Room ambience", 0, 1, 0.01, ""],
   ["volume", "Output volume", 0, 2, 0.01, ""],
+  ["laughter", "Laughing while speaking", 0, 1, 0.05, ""],
 ];
 
 const SLIDERS_PHYSICS = [
-  ["closure", "Fold closure sharpness", 0, 1, 0.05, ""],
-  ["openQuotient", "Open quotient (pressed↔soft)", 0.5, 0.74, 0.01, ""],
-  ["pitchCoupling", "Pitch–fold coupling", 0, 1, 0.01, ""],
+  ["closure", "Closure sharpness", 0, 1, 0.05, ""],
+  ["openQuotient", "Open quotient", 0.5, 0.74, 0.01, ""],
+  ["pitchCoupling", "Pitch coupling", 0, 1, 0.01, ""],
   ["subglottal", "Subglottal airway", 0, 1, 0.01, ""],
   ["chestResonance", "Chest body", 0, 1, 0.01, ""],
-  ["roughness", "Roughness / jitter", 0, 0.75, 0.01, ""],
-  ["nasality", "Baseline nasality", 0, 0.8, 0.01, ""],
+  ["roughness", "Roughness", 0, 0.75, 0.01, ""],
+  ["nasality", "Nasality", 0, 0.8, 0.01, ""],
   ["vibrato", "Vibrato depth", 0, 1, 0.01, ""],
-  ["air", "Upper-tract air (>5 kHz)", 0, 1, 0.01, ""],
+  ["air", "Air above 5 kHz", 0, 1, 0.01, ""],
   ["formants.0", "Vowel openness (F1)", 0.8, 1.25, 0.01, "×"],
   ["formants.1", "Tongue frontness (F2)", 0.8, 1.25, 0.01, "×"],
   ["formants.2", "Third formant (F3)", 0.8, 1.25, 0.01, "×"],
-  ["formants.3,4", "Singer's cluster (F4–F5)", 0.8, 1.25, 0.01, "×"],
+  ["formants.3,4", "Upper cluster (F4, F5)", 0.8, 1.25, 0.01, "×"],
 ];
 
 const SLIDERS_TONE_MACRO = [
-  ["bass", "Bass (<300 Hz)", -12, 12, 0.5, " dB"],
-  ["presence", "Presence (3–4 kHz)", -12, 12, 0.5, " dB"],
-  ["brightness", "Brightness (>5 kHz)", -12, 12, 0.5, " dB"],
+  ["bass", "Bass", -12, 12, 0.5, " dB"],
+  ["presence", "Presence", -12, 12, 0.5, " dB"],
+  ["brightness", "Brightness", -12, 12, 0.5, " dB"],
 ];
 
+// [file, name, notes shown under the name, speaking pitch in Hz]
 const PROFILES = [
-  ["arctic_bdl", "US Man A", "BDL · 113 Hz · brisk"],
-  ["arctic_rms", "US Man B (Deep)", "RMS · 92 Hz · resonant"],
-  ["arctic_slt", "US Woman A", "SLT · 186 Hz · clear"],
-  ["arctic_clb", "US Woman B", "CLB · 184 Hz · warm"],
+  ["arctic_bdl", "US man A", ["113 Hz", "brisk"], 113],
+  ["arctic_rms", "US man B", ["92 Hz", "deep"], 92],
+  ["arctic_slt", "US woman A", ["186 Hz", "clear"], 186],
+  ["arctic_clb", "US woman B", ["184 Hz", "warm"], 184],
 ];
 
 const PRESET_META = {
-  male: "110 Hz · 17.5 cm",
-  deep: "86 Hz · 18.8 cm",
-  husky: "106 Hz · raspy",
-  female: "208 Hz · 13.9 cm",
-  bright: "222 Hz · lively",
-  whisper: "unvoiced air",
+  male: ["110 Hz", "17.5 cm"],
+  deep: ["86 Hz", "18.8 cm"],
+  husky: ["106 Hz", "raspy"],
+  female: ["208 Hz", "13.9 cm"],
+  bright: ["222 Hz", "lively"],
+  whisper: ["no voicing"],
 };
+
+// Lettering drawn on the plates (the same faces the page uses).
+const UI_FONT = 'Bahnschrift, "DIN Alternate", "Avenir Next", "Segoe UI", system-ui, sans-serif';
+const IPA_FONT = '"Charis SIL", "Doulos SIL", "Gentium Plus", Cambria, "Palatino Linotype", "Times New Roman", serif';
+
+// Plate palette: film base, bone and soft tissue as a radiograph shows them, and three
+// meanings - rose is tissue that articulates, gold is voicing, ice is moving air.
+const FILM = {
+  base: "#0b141c",
+  deep: "#070d13",
+  grid: "rgba(196, 220, 238, 0.06)",
+  line: "rgba(196, 220, 238, 0.14)",
+  bone: "#dbe7f0",
+  label: "rgba(203, 221, 235, 0.6)",
+  rose: "#f0668a",
+  gold: "#f2b84b",
+  ice: "#bfe3f5",
+};
+
+// Position (0..1) of a pitch between the lowest and highest speaking voices, by octaves.
+function pitchPosition(hz) {
+  return Math.max(0.02, Math.min(0.98, Math.log2(hz / 70) / Math.log2(280 / 70)));
+}
+
+function voiceCardHtml(name, notes, pitchHz) {
+  const meta = notes.map((n) => `<span>${n}</span>`).join("");
+  const marker = pitchHz ? `<span class="vc-pitch" style="--p:${pitchPosition(pitchHz).toFixed(3)}" title="${Math.round(pitchHz)} Hz"></span>` : "";
+  return `<span class="vc-name">${name}</span><span class="vc-meta">${meta}</span>${marker}`;
+}
 
 // Base acoustic positions (normalized 0..1 in F2 front->back and F1 close->open) & carrier words for the 16 vowels
 const VOWEL_INFO = {
@@ -277,7 +312,7 @@ function cycleTheme() {
   const t = THEMES[themeIdx];
   if (t === "auto") document.documentElement.removeAttribute("data-theme");
   else document.documentElement.setAttribute("data-theme", t);
-  $("themeBtn").textContent = `Theme: ${t[0].toUpperCase()}${t.slice(1)}`;
+  $("themeBtn").textContent = `Theme: ${t}`;
   drawVowelSpace();
 }
 
@@ -299,8 +334,9 @@ function writeSetting(key, value) {
 }
 
 function formatVal(val, step, unit) {
-  const decimals = step < 0.05 ? 2 : step < 1 ? 1 : 0;
-  const num = Number(val).toFixed(decimals).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+  // as many decimals as the step needs (0.05 steps show 0.75, not 0.8), without trailing zeros
+  const decimals = step < 0.1 ? 2 : step < 1 ? 1 : 0;
+  const num = Number(val).toFixed(decimals).replace(/\.0+$/, "").replace(/(\.\d)0$/, "$1");
   return `${val > 0 && unit === " dB" ? "+" : ""}${num}${unit}`;
 }
 
@@ -310,13 +346,31 @@ function scheduleAutoSpeak() {
   autoSpeakTimer = setTimeout(() => speak(0), 220);
 }
 
-// Build sliders for a container
+// How far along its track a range input is (0..1), for a given value or its own.
+function rangeFraction(input, value = Number(input.value)) {
+  const min = Number(input.min);
+  const max = Number(input.max);
+  return max > min ? Math.max(0, Math.min(1, (value - min) / (max - min))) : 0;
+}
+
+// Fills a slider's track up to its thumb (WebKit has no native way). A control that runs
+// either side of zero (dB gains) is filled from zero, so boost and cut read differently.
+function paintRange(input) {
+  const at = rangeFraction(input) * 100;
+  const zero = Number(input.min) < 0 && Number(input.max) > 0 ? rangeFraction(input, 0) * 100 : 0;
+  input.style.setProperty("--lo", `${Math.min(at, zero).toFixed(2)}%`);
+  input.style.setProperty("--hi", `${Math.max(at, zero).toFixed(2)}%`);
+}
+
+// Build sliders for a container. One entry per control:
+//   [setting key, label, min, max, step, unit suffix]
+// A key may address array members: "formants.0", or "formants.3,4" to move several together.
 function populateSliders(containerId, defs) {
   const host = $(containerId);
   for (const [key, label, min, max, step, unit] of defs) {
     const wrap = document.createElement("label");
     wrap.className = "slider";
-    wrap.innerHTML = `<span class="s-name">${label}</span><output></output><input type="range" min="${min}" max="${max}" step="${step}">`;
+    wrap.innerHTML = `<span class="s-name">${label}</span><output></output><span class="s-track"><input class="rng" type="range" min="${min}" max="${max}" step="${step}"></span>`;
     const input = wrap.querySelector("input");
     const out = wrap.querySelector("output");
     input.dataset.key = key;
@@ -326,6 +380,7 @@ function populateSliders(containerId, defs) {
       const v = Number(input.value);
       writeSetting(key, v);
       out.textContent = formatVal(v, step, unit);
+      paintRange(input);
       markCustomCard();
       scheduleAutoSpeak();
     });
@@ -335,6 +390,7 @@ function populateSliders(containerId, defs) {
       input.value = defVal;
       writeSetting(key, defVal);
       out.textContent = formatVal(defVal, step, unit);
+      paintRange(input);
       scheduleAutoSpeak();
     });
     host.append(wrap);
@@ -352,7 +408,7 @@ function buildEqBars() {
     col.innerHTML = `
       <output id="eqOut${idx}">0</output>
       <div class="eq-vslider-wrap">
-        <input type="range" min="-18" max="18" step="0.5" value="0" data-band="${idx}" title="${hz} Hz band (double-click to zero)">
+        <input class="rng" type="range" min="-18" max="18" step="0.5" value="0" data-band="${idx}" aria-label="${hz} Hz" title="${hz} Hz (double-click for 0 dB)">
       </div>
       <span class="eq-hz">${hzText}</span>
     `;
@@ -363,6 +419,7 @@ function buildEqBars() {
       tone[idx] = Number(input.value);
       voice.configure({ tone });
       out.textContent = `${tone[idx] > 0 ? "+" : ""}${tone[idx]}`;
+      paintRange(input);
       markCustomCard();
       scheduleAutoSpeak();
     });
@@ -372,8 +429,10 @@ function buildEqBars() {
       voice.configure({ tone });
       input.value = 0;
       out.textContent = "0";
+      paintRange(input);
       scheduleAutoSpeak();
     });
+    paintRange(input);
     host.append(col);
   });
 }
@@ -387,7 +446,7 @@ function buildPromptChips() {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = `chip${idx === 0 ? " active" : ""}`;
-      btn.textContent = `♪ ${preset.title}`;
+      btn.textContent = preset.title;
       btn.onclick = () => {
         for (const c of host.children) c.classList.remove("active");
         btn.classList.add("active");
@@ -404,7 +463,7 @@ function buildPromptChips() {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `chip${idx === 0 ? " active" : ""}`;
-    btn.textContent = studioMode === "script" ? `🎭 ${title}` : title;
+    btn.textContent = title;
     btn.onclick = () => {
       for (const c of host.children) c.classList.remove("active");
       btn.classList.add("active");
@@ -433,6 +492,7 @@ function setSingSubView(view) {
       ? buildSoloDslFromState()
       : buildChorusDslFromState();
   }
+  updateLivePhonetics();
   updateApiSnippet();
 }
 
@@ -487,7 +547,7 @@ function renderChorusTracks() {
     const chk = document.createElement("input");
     chk.type = "checkbox";
     chk.checked = part.active;
-    chk.title = "Enable / mute this voice part";
+    chk.title = "Include this part";
     chk.onchange = () => {
       part.active = chk.checked;
       row.classList.toggle("muted", !part.active);
@@ -505,7 +565,7 @@ function renderChorusTracks() {
     };
 
     const voiceSel = document.createElement("select");
-    voiceSel.title = "Vocal tract singer archetype";
+    voiceSel.title = "Who sings this part";
     for (const [vid, vlabel] of SINGER_VOICE_OPTIONS) {
       voiceSel.append(new Option(vlabel, vid, false, vid === part.voice));
     }
@@ -532,23 +592,26 @@ function renderChorusTracks() {
 
     const gainIn = document.createElement("input");
     gainIn.type = "range";
-    gainIn.className = "c-gain";
+    gainIn.className = "c-gain rng";
     gainIn.min = "0.2";
     gainIn.max = "1.5";
     gainIn.step = "0.05";
     gainIn.value = String(part.gain);
-    gainIn.title = `Part mix level (${Math.round(part.gain * 100)}%)`;
+    gainIn.title = `Level of this part (${Math.round(part.gain * 100)}%)`;
+    paintRange(gainIn);
     gainIn.oninput = () => {
       part.gain = Number(gainIn.value);
-      gainIn.title = `Part mix level (${Math.round(part.gain * 100)}%)`;
+      gainIn.title = `Level of this part (${Math.round(part.gain * 100)}%)`;
+      paintRange(gainIn);
       scheduleAutoSpeak();
     };
 
     const delBtn = document.createElement("button");
     delBtn.type = "button";
-    delBtn.className = "ghost sm";
+    delBtn.className = "quiet sm";
     delBtn.textContent = "×";
-    delBtn.title = "Remove part";
+    delBtn.title = "Remove this part";
+    delBtn.setAttribute("aria-label", "Remove this part");
     delBtn.disabled = chorusPartsState.length <= 1;
     delBtn.onclick = () => {
       if (chorusPartsState.length <= 1) return;
@@ -580,7 +643,7 @@ function buildPianoStrip() {
     const isSharp = note.includes("#") || note.includes("b");
     btn.className = `pkey${isSharp ? " sharp" : ""}`;
     btn.textContent = note;
-    btn.title = `Audition ${note} (${Math.round(TTS.noteToHz(note))} Hz) & append to active melody`;
+    btn.title = `${note}, ${Math.round(TTS.noteToHz(note))} Hz: hear it and add it to the melody`;
     btn.onclick = () => {
       const beats = $("noteDurSelect").value || "1";
       insertMusicToken(`${note}:${beats}`);
@@ -589,8 +652,8 @@ function buildPianoStrip() {
     host.append(btn);
   }
   for (const [tok, label, tip] of [
-    ["R", "Rest", "Insert musical rest of selected beat duration"],
-    ["~", "Slur ~", "Hold / melisma-slur previous vowel onto a new pitch"],
+    ["R", "Rest", "Add a rest of the chosen length"],
+    ["~", "Hold ~", "Carry the previous vowel over onto the next note"],
   ]) {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -643,6 +706,12 @@ function auditionSingleNote(note) {
   } catch {}
 }
 
+const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || "");
+
+function readyText() {
+  return `Ready. Press ${$("speakLabel").textContent}, or ${IS_MAC ? "⌘" : "Ctrl"}+Enter while typing.`;
+}
+
 function setStudioMode(mode) {
   if (studioMode === "speech") savedSpeechText = $("text").value;
   else if (studioMode === "script") savedScriptText = $("text").value;
@@ -653,14 +722,12 @@ function setStudioMode(mode) {
   $("modeSingBtn").classList.toggle("active", mode === "sing");
 
   $("scriptToolbar").hidden = mode !== "script";
+  $("soundBar").hidden = mode !== "script";
   $("textComposerWrap").hidden = mode === "sing";
   $("singComposerWrap").hidden = mode !== "sing";
 
-  $("speak").textContent = mode === "sing"
-    ? "▶ Sing"
-    : mode === "script"
-      ? "▶ Perform Script"
-      : "▶ Speak";
+  $("speakLabel").textContent = mode === "sing" ? "Sing" : mode === "script" ? "Perform" : "Speak";
+  if ($("status").textContent.startsWith("Ready.")) $("status").textContent = readyText();
 
   if (mode === "speech") {
     $("text").value = savedSpeechText;
@@ -685,26 +752,20 @@ function buildVoiceCards() {
     card.type = "button";
     card.className = "voice-card";
     card.dataset.cardId = p.id;
-    card.innerHTML = `
-      <span class="vc-name">${p.label}</span>
-      <span class="vc-meta">${PRESET_META[p.id] || `${p.pitchHz} Hz`}</span>
-    `;
+    card.innerHTML = voiceCardHtml(p.label, PRESET_META[p.id] || [`${Math.round(p.pitchHz)} Hz`], p.id === "whisper" ? 0 : p.pitchHz);
     card.onclick = () => selectBuiltinPreset(p.id);
     builtinHost.append(card);
   }
 
   const profileHost = $("profileCards");
-  for (const [id, title, meta] of PROFILES) {
+  for (const [id, title, notes, pitchHz] of PROFILES) {
     const cardId = `profile:${id}`;
     select.append(new Option(title, cardId));
     const card = document.createElement("button");
     card.type = "button";
     card.className = "voice-card";
     card.dataset.cardId = cardId;
-    card.innerHTML = `
-      <span class="vc-name">${title}</span>
-      <span class="vc-meta">${meta}</span>
-    `;
+    card.innerHTML = voiceCardHtml(title, notes, pitchHz);
     card.onclick = () => loadBuiltinProfile(id, title, cardId);
     profileHost.append(card);
   }
@@ -730,7 +791,7 @@ function selectBuiltinPreset(id) {
   voice.configure(id);
   baseSettingsSnapshot = structuredCloneSettings(voice.settings);
   syncControls(id);
-  $("profileStatus").textContent = `Active preset: ${id[0].toUpperCase()}${id.slice(1)} (${voice.settings.folds ? "Simulated vocal folds" : "LF equation pulse"}).`;
+  $("profileStatus").textContent = `${id[0].toUpperCase()}${id.slice(1)} voice, with ${voice.settings.folds ? "simulated vocal folds" : "the equation pulse"}.`;
   scheduleAutoSpeak();
 }
 
@@ -742,7 +803,7 @@ async function loadBuiltinProfile(id, label, cardId) {
     applyProfileObject(profile, label, cardId);
     scheduleAutoSpeak();
   } catch (err) {
-    $("profileStatus").textContent = `Could not load profile (${err.message}).`;
+    $("profileStatus").textContent = `That voice could not be loaded (${err.message}).`;
   }
 }
 
@@ -760,7 +821,7 @@ function applyProfileObject(profile, label, cardId = "") {
   voice.configure({ ...profile, volume, variation, seed, folds: profile.folds ?? folds });
   baseSettingsSnapshot = structuredCloneSettings(voice.settings);
   syncControls(cardId);
-  $("profileStatus").textContent = `Loaded speaker profile: ${label} (pure parameter fit, zero audio samples).`;
+  $("profileStatus").textContent = `${label}: settings fitted to a real speaker. No audio of them is used.`;
 }
 
 function syncControls(cardId) {
@@ -768,11 +829,12 @@ function syncControls(cardId) {
   for (const input of document.querySelectorAll("label.slider input[type='range']")) {
     const val = readSetting(s, input.dataset.key);
     input.value = val;
-    input.parentElement.querySelector("output").textContent = formatVal(
-      val,
-      Number(input.dataset.step),
-      input.dataset.unit
-    );
+    const row = input.closest("label.slider");
+    row.querySelector("output").textContent = formatVal(val, Number(input.dataset.step), input.dataset.unit);
+    paintRange(input);
+    // the tick under the track: this voice's own value
+    const own = baseSettingsSnapshot ? readSetting(baseSettingsSnapshot, input.dataset.key) : val;
+    row.querySelector(".s-track").style.setProperty("--def", rangeFraction(input, Number(own)).toFixed(4));
   }
   s.tone.forEach((g, idx) => {
     const input = document.querySelector(`#eqBars input[data-band="${idx}"]`);
@@ -780,6 +842,7 @@ function syncControls(cardId) {
     if (input && out) {
       input.value = g;
       out.textContent = `${g > 0 ? "+" : ""}${Math.round(g * 10) / 10}`;
+      paintRange(input);
     }
   });
   $("whisper").checked = s.whisper;
@@ -791,6 +854,7 @@ function syncControls(cardId) {
   $("female").setAttribute("aria-pressed", String(s.gender === "female"));
   if (cardId !== undefined) highlightActiveCard(cardId);
   drawVowelSpace();
+  updateApiSnippet();
 }
 
 // Live text normalization + IPA / ARPAbet preview
@@ -800,8 +864,9 @@ function updateLivePhonetics() {
     const lyr = singSubView === "solo" ? $("soloLyricsInput").value : $("chorusLyricsInput").value;
     const activeCount = chorusPartsState.filter((p) => p.active).length;
     $("normPreview").textContent = singSubView === "chorus"
-      ? `${activeCount} active choir part${activeCount === 1 ? "" : "s"} · ${$("singBpmInput").value} BPM`
-      : `Solo melody · ${$("singBpmInput").value} BPM`;
+      ? `${activeCount} part${activeCount === 1 ? "" : "s"} at ${$("singBpmInput").value} bpm`
+      : `Solo at ${$("singBpmInput").value} bpm`;
+    $("ipa").classList.remove("arpa");
     $("ipa").textContent = lyr.trim() ? voice.phonemize(lyr.replace(/[~|-]/g, " ")) : "";
     return;
   }
@@ -814,14 +879,15 @@ function updateLivePhonetics() {
   const stripped = raw.replace(/\[[^\]]+\]/g, " ").replace(/\s+/g, " ").trim();
   const norm = voice.normalize(stripped || raw);
   const wordCount = norm.trim() ? norm.trim().split(/\s+/).length : 0;
-  $("normPreview").textContent = `${wordCount} spoken word${wordCount === 1 ? "" : "s"}`;
+  $("normPreview").textContent = `${wordCount} word${wordCount === 1 ? "" : "s"} when read out`;
+  $("ipa").classList.toggle("arpa", phoneticMode !== "ipa");
   $("ipa").textContent = phoneticMode === "ipa" ? voice.phonemize(stripped || raw) : voice.arpabet(stripped || raw);
 }
 
 function updateApiSnippet() {
   const box = $("apiSnippetBox");
   if (!box) return;
-  const loaderHeader = `// Self-contained single-file tts.wasm (JS glue lives inside the .wasm!)
+  const loaderHeader = `// tts.wasm is the whole engine: its JavaScript wrapper is stored inside it.
 const { instance: { exports: w } } = await WebAssembly.instantiateStreaming(fetch("./tts.wasm"));
 const { TTS, encodeWav } = Function("wasm", new TextDecoder().decode(
   new Uint8Array(w.memory.buffer, w.tts_glue_ptr(), w.tts_glue_len())
@@ -868,24 +934,25 @@ ${loaderHeader}
 
 const voice = new TTS();
 
-// Dynamically create & name reusable characters (locking some params, randomizing the rest):
+// Invent named characters (fix what matters, the rest is drawn at random):
 voice.randomize({ name: "hero", gender: "female", speed: 1.06 });
 voice.randomize({ name: "guide", gender: "male", pitchHz: 94 });
 
-// Perform inline script (supports [hero], [guide], emotions, speed, & singing):
+// Perform the script; [hero] and [guide] now work as voice tags in it:
 await voice.playScript(\`${sampleScript}\`);
 </script>`;
   } else {
+    const said = JSON.stringify($("text").value.trim() || "Hello!");
+    const who = voice && voice.settings.gender === "female" ? '"female"' : "";
     box.textContent = `<script type="module">
 ${loaderHeader}
 
-const voice = new TTS(); // default male, or new TTS("female")
-await voice.play("Hello from tts.computer — a single self-contained WASM file!");
+const voice = new TTS(${who}); // or a preset id, or a settings object
+await voice.play(${said});
 
-// Create a random voice (locking gender/speed, randomizing the rest) & reuse it anywhere:
+// Invent a voice (fix what matters, the rest is drawn at random) and reuse it:
 const custom = TTS.randomVoice({ gender: "female", warmth: 0.7 });
-const actor = new TTS(custom);
-await actor.play("I can speak dialogue and sing melodies with this exact voice!");
+await new TTS(custom).play("The same settings always give the same voice.");
 </script>`;
   }
 }
@@ -929,22 +996,27 @@ function fftRadix2(re, im) {
   }
 }
 
-// Perceptual studio colormap (deep navy -> cobalt -> magenta -> amber -> cream)
-function magmaColor(t) {
+// Spectrogram ramp: film base through steel blue to near white, the way a radiograph shows
+// density. One hue, so the coloured traces drawn over it (pitch, formants) stay readable.
+const FILM_RAMP = [
+  [0.0, 11, 20, 28],
+  [0.22, 19, 42, 60],
+  [0.5, 54, 102, 138],
+  [0.76, 150, 192, 216],
+  [1.0, 246, 251, 254],
+];
+
+function filmColor(t) {
   const x = Math.max(0, Math.min(1, t));
-  if (x < 0.25) {
-    const u = x / 0.25;
-    return [12 + u * 26, 14 + u * 28, 19 + u * 75];
-  } else if (x < 0.55) {
-    const u = (x - 0.25) / 0.30;
-    return [38 + u * 138, 42 + u * 16, 94 + u * 48];
-  } else if (x < 0.82) {
-    const u = (x - 0.55) / 0.27;
-    return [176 + u * 72, 58 + u * 96, 142 - u * 86];
-  } else {
-    const u = (x - 0.82) / 0.18;
-    return [248 + u * 7, 154 + u * 92, 56 + u * 145];
+  for (let i = 1; i < FILM_RAMP.length; i++) {
+    const b = FILM_RAMP[i];
+    if (x <= b[0]) {
+      const a = FILM_RAMP[i - 1];
+      const u = (x - a[0]) / (b[0] - a[0]);
+      return [a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u, a[3] + (b[3] - a[3]) * u];
+    }
   }
+  return [246, 251, 254];
 }
 
 function computePitchTrack(samples, sr, gender) {
@@ -1005,8 +1077,11 @@ function buildAcousticCache(speech) {
   off.width = w;
   off.height = h;
   const ctx = off.getContext("2d");
-  ctx.fillStyle = "#0c0e13";
+  ctx.fillStyle = FILM.base;
   ctx.fillRect(0, 0, w, h);
+  // Traces get finer when many seconds share few pixels (a long text, a narrow screen)
+  const crowd = Math.max(0.6, Math.min(1, (0.03 * Math.max(1, canvas.clientWidth)) / Math.max(0.5, speech.duration)));
+  const lw = dpr * crowd;
 
   const samples = speech.samples;
   const sr = speech.sampleRate;
@@ -1052,8 +1127,8 @@ function buildAcousticCache(speech) {
     const dynRange = 64;
     for (let x = 0; x < cols; x++) {
       for (let b = 0; b < maxBin; b++) {
-        const norm = (mags[x * maxBin + b] - (peakDb - dynRange)) / dynRange;
-        const [r, g, bl] = magmaColor(norm);
+        const norm = Math.max(0, (mags[x * maxBin + b] - (peakDb - dynRange)) / dynRange);
+        const [r, g, bl] = filmColor(Math.pow(norm, 0.82));
         const row = maxBin - 1 - b;
         const p = (row * cols + x) * 4;
         img.data[p] = r;
@@ -1067,7 +1142,7 @@ function buildAcousticCache(speech) {
     ctx.drawImage(specImg, 0, 0, w, h);
   } else {
     // Waveform + RMS envelope
-    ctx.strokeStyle = "rgba(255,255,255,0.07)";
+    ctx.strokeStyle = FILM.line;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, h / 2);
@@ -1075,8 +1150,8 @@ function buildAcousticCache(speech) {
     ctx.stroke();
 
     const spp = samples.length / w;
-    ctx.fillStyle = "rgba(82, 157, 255, 0.34)";
-    ctx.strokeStyle = "#529dff";
+    ctx.fillStyle = "rgba(166, 203, 224, 0.62)";
+    ctx.strokeStyle = FILM.ice;
     ctx.lineWidth = 1.2 * dpr;
     ctx.beginPath();
     for (let x = 0; x < w; x++) {
@@ -1095,11 +1170,11 @@ function buildAcousticCache(speech) {
     }
   }
 
-  // Subtle frequency/grid lines + word boundary ticks
-  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  // Frequency lines (lettered on the spectrogram) + a tick where each word starts
+  ctx.strokeStyle = FILM.line;
   ctx.lineWidth = 1;
   for (let k = 1; k <= 3; k++) {
-    const y = (k / 4) * h;
+    const y = Math.round((k / 4) * h) + 0.5;
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(w, y);
@@ -1107,9 +1182,9 @@ function buildAcousticCache(speech) {
   }
   for (const wd of speech.words) {
     const x = (wd.start / speech.duration) * w;
-    ctx.strokeStyle = "rgba(255,255,255,0.10)";
+    ctx.strokeStyle = "rgba(219, 231, 240, 0.22)";
     ctx.beginPath();
-    ctx.moveTo(x, h - 14 * dpr);
+    ctx.moveTo(x, h - 9 * dpr);
     ctx.lineTo(x, h);
     ctx.stroke();
   }
@@ -1121,14 +1196,15 @@ function buildAcousticCache(speech) {
 
   if (vizMode === "spec" && showFormants && acCount > 1) {
     const fMaxSpec = 8000;
+    // the resonances are what the articulators make: all three in the tissue colour
     const colors = [
-      [1, "rgba(251, 146, 60, 0.78)"], // F1 warm amber-coral
-      [2, "rgba(244, 114, 182, 0.75)"], // F2 rose
-      [3, "rgba(167, 139, 250, 0.72)"], // F3 soft violet
+      [1, "rgba(240, 102, 138, 0.86)"],
+      [2, "rgba(240, 102, 138, 0.86)"],
+      [3, "rgba(240, 102, 138, 0.86)"],
     ];
     ctx.save();
-    ctx.setLineDash([3 * dpr, 3 * dpr]);
-    ctx.lineWidth = 1.45 * dpr;
+    ctx.lineWidth = 1.15 * lw;
+    ctx.lineJoin = "round";
     ctx.lineCap = "round";
     for (const [fIdx, color] of colors) {
       ctx.strokeStyle = color;
@@ -1176,10 +1252,10 @@ function buildAcousticCache(speech) {
     }
   }
   ctx.save();
-  ctx.strokeStyle = "#38bdf8";
-  ctx.shadowColor = "rgba(56, 189, 248, 0.45)";
-  ctx.shadowBlur = 4 * dpr;
-  ctx.lineWidth = 2.2 * dpr;
+  ctx.strokeStyle = FILM.gold;
+  ctx.shadowColor = "rgba(7, 13, 19, 0.7)";
+  ctx.shadowBlur = 3 * dpr;
+  ctx.lineWidth = 2 * lw;
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   let penDown = false;
@@ -1225,6 +1301,20 @@ function buildAcousticCache(speech) {
   ctx.stroke();
   ctx.restore();
 
+  // Letter the frequency lines last, over the traces
+  if (vizMode === "spec") {
+    ctx.save();
+    ctx.font = `${10.5 * dpr}px ${UI_FONT}`;
+    ctx.textBaseline = "bottom";
+    ctx.shadowColor = "rgba(7, 13, 19, 0.9)";
+    ctx.shadowBlur = 3 * dpr;
+    ctx.fillStyle = "rgba(219, 231, 240, 0.82)";
+    for (let k = 1; k <= 3; k++) {
+      ctx.fillText(`${8 - 2 * k} kHz`, 7 * dpr, Math.round((k / 4) * h) - 2 * dpr);
+    }
+    ctx.restore();
+  }
+
   cachedAcousticBitmap = off;
 }
 
@@ -1234,19 +1324,20 @@ function renderAcousticFrame(playSec) {
   const w = canvas.width;
   const h = canvas.height;
   if (!cachedAcousticBitmap || !lastSpeech) {
-    ctx.fillStyle = "#0c0e13";
+    ctx.fillStyle = FILM.base;
     ctx.fillRect(0, 0, w, h);
     return;
   }
   ctx.drawImage(cachedAcousticBitmap, 0, 0, w, h);
 
   if (playSec >= 0 && lastSpeech.duration > 0) {
+    // what is still to come is held back a little; the cursor is plain white
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const x = Math.max(0, Math.min(w, (playSec / lastSpeech.duration) * w));
-    ctx.fillStyle = "rgba(255, 224, 130, 0.12)";
-    ctx.fillRect(0, 0, x, h);
-    ctx.strokeStyle = "#ffe082";
-    ctx.lineWidth = 2 * dpr;
+    ctx.fillStyle = "rgba(7, 13, 19, 0.38)";
+    ctx.fillRect(x, 0, w - x, h);
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.5 * dpr;
     ctx.beginPath();
     ctx.moveTo(x, 0);
     ctx.lineTo(x, h);
@@ -1351,41 +1442,28 @@ function sampleSpeechAt(speech, tSec) {
     out.segPitch = chosen.pitchHz;
     out.segVoice = chosen.voice;
     out.segSinging = Boolean(chosen.singing);
+    // a laugh or a sigh only while it lasts
+    out.segSound = chosen.sound && tSec >= chosen.start && tSec <= chosen.end ? chosen.sound : "";
   }
   return out;
 }
 
-function updateLiveBadges(word, ipa, phone, f0, voicing, speakerLabel = "", singing = false) {
+// Writes text only when it changes (these run every animation frame).
+function setText(el, text) {
+  if (el && el.textContent !== text) el.textContent = text;
+}
+
+// The readout slots keep their place when empty, so nothing shifts as the words go by.
+function updateLiveBadges(word, ipa, phone, f0, voicing, speakerLabel = "", singing = false, sound = "") {
   const sb = $("activeSpeakerBadge");
-  const wb = $("activeWordBadge");
-  const pb = $("activePhoneBadge");
-  const fb = $("activeF0Badge");
   if (sb) {
-    if (speakerLabel) {
-      sb.hidden = false;
-      sb.textContent = `${singing ? "♪ " : "🎙 "}${speakerLabel.toUpperCase()}`;
-    } else {
-      sb.hidden = true;
-    }
+    sb.hidden = !speakerLabel;
+    const doing = sound ? `, ${SOUND_LABELS.get(sound) || sound}` : singing ? ", singing" : "";
+    if (speakerLabel) setText(sb, `${speakerLabel}${doing}`);
   }
-  if (word) {
-    wb.hidden = false;
-    wb.textContent = word;
-  } else {
-    wb.hidden = true;
-  }
-  if (ipa && phone && phone !== "SIL") {
-    pb.hidden = false;
-    pb.textContent = `/${ipa}/ · ${phone}`;
-  } else {
-    pb.hidden = true;
-  }
-  if (voicing > 0.16 && f0 > 45) {
-    fb.hidden = false;
-    fb.textContent = `${Math.round(f0)} Hz`;
-  } else {
-    fb.hidden = true;
-  }
+  setText($("activeWordBadge"), word || "");
+  setText($("activePhoneBadge"), ipa && phone && phone !== "SIL" ? `/${ipa}/ ${phone}` : "");
+  setText($("activeF0Badge"), voicing > 0.16 && f0 > 45 ? `${Math.round(f0)} Hz` : "");
 }
 
 function constrictionPoint(phone, lipProtrude, upperLipY, lowerLipY, tipX, tipY, dorsumX, dorsumY) {
@@ -1453,7 +1531,7 @@ function stepStagePhysics(nowMs, target) {
     tTip: 0.16,
     lipR: 0.04,
     lipS: 0.05,
-    lipC: 0.22,
+    lipC: 0.72, // at rest the lips are together
     velum: 0.0,
     energy: 0.0,
     voicing: 0.0,
@@ -1585,12 +1663,19 @@ function drawExpressiveFace(ctx, x0, y0, boxW, boxH, nowMs) {
   const sizeNorm = Math.max(-1, Math.min(1, (tract - 15.6) / 2.6)); // -1 compact .. +1 deep
   const isWhispering = (anim.voicing < 0.05 && anim.noise > 0.08) || Boolean(voice?.settings.whisper);
 
-  // Subtle acoustic halo behind avatar
-  const haloAlpha = 0.08 + anim.voicing * 0.22 + anim.noise * 0.12;
-  const halo = ctx.createRadialGradient(cx, cy - 8 * sc, 12 * sc, cx, cy - 8 * sc, 102 * sc);
-  halo.addColorStop(0, isWhispering ? `rgba(148, 163, 184, ${haloAlpha})` : `rgba(56, 189, 248, ${haloAlpha})`);
-  halo.addColorStop(0.6, `rgba(244, 114, 182, ${anim.voicing * 0.09})`);
-  halo.addColorStop(1, "rgba(12, 14, 19, 0)");
+  // A lit backdrop, so the speaker reads as a person in a room and not a head on black
+  const backdrop = ctx.createRadialGradient(cx, cy - 14 * sc, 10 * sc, cx, cy - 4 * sc, Math.max(boxW, boxH) * 0.72);
+  backdrop.addColorStop(0, "#2b4257");
+  backdrop.addColorStop(0.55, "#182a3a");
+  backdrop.addColorStop(1, "rgba(11, 20, 28, 0)");
+  ctx.fillStyle = backdrop;
+  ctx.fillRect(x0, y0, boxW, boxH);
+
+  // The voice as a glow behind the head: gold when voiced, ice for breath alone
+  const haloAlpha = anim.voicing * 0.2 + anim.noise * 0.1;
+  const halo = ctx.createRadialGradient(cx, cy - 8 * sc, 12 * sc, cx, cy - 8 * sc, 104 * sc);
+  halo.addColorStop(0, isWhispering ? `rgba(191, 227, 245, ${haloAlpha})` : `rgba(242, 184, 75, ${haloAlpha})`);
+  halo.addColorStop(1, "rgba(11, 20, 28, 0)");
   ctx.fillStyle = halo;
   ctx.fillRect(x0, y0, boxW, boxH);
 
@@ -1653,10 +1738,10 @@ function drawExpressiveFace(ctx, x0, y0, boxW, boxH, nowMs) {
 
   // Tailored studio jacket / crew-neck sweater anchored to bottom of stage
   const coatGrad = ctx.createLinearGradient(0, 70, 0, 118);
-  coatGrad.addColorStop(0, isFem ? "#2b3650" : "#242e42");
-  coatGrad.addColorStop(1, "#111622");
+  coatGrad.addColorStop(0, isFem ? "#3a4f63" : "#33475a");
+  coatGrad.addColorStop(1, "#16232f");
   ctx.fillStyle = coatGrad;
-  ctx.strokeStyle = "rgba(255,255,255,0.13)";
+  ctx.strokeStyle = "rgba(219, 231, 240, 0.16)";
   ctx.lineWidth = 1.4;
   ctx.beginPath();
   ctx.moveTo(-neckHalf - 56, 118);
@@ -1709,8 +1794,8 @@ function drawExpressiveFace(ctx, x0, y0, boxW, boxH, nowMs) {
   const skinGrad = ctx.createRadialGradient(-15, -28, 8, 0, 4, 90);
   skinGrad.addColorStop(0, isFem ? "#f9d2be" : "#f1c5ae");
   skinGrad.addColorStop(0.55, isFem ? "#e8b299" : "#dca48b");
-  skinGrad.addColorStop(0.88, isFem ? "#cf9279" : "#c1856d");
-  skinGrad.addColorStop(1, isFem ? "#b5765f" : "#a66a54");
+  skinGrad.addColorStop(0.88, isFem ? "#d69d86" : "#c99079");
+  skinGrad.addColorStop(1, isFem ? "#c38a74" : "#b67d67");
 
   ctx.fillStyle = skinGrad;
   ctx.beginPath();
@@ -1783,7 +1868,7 @@ function drawExpressiveFace(ctx, x0, y0, boxW, boxH, nowMs) {
   ctx.fill();
 
   // Hair crown specular ribbon highlight
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.13)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
   ctx.lineWidth = 2.8;
   ctx.lineCap = "round";
   ctx.beginPath();
@@ -1828,9 +1913,9 @@ function drawExpressiveFace(ctx, x0, y0, boxW, boxH, nowMs) {
     ctx.quadraticCurveTo(ex, ey + openH * 1.16, ex - 11.5, ey + 0.5);
     ctx.closePath();
     const scleraGrad = ctx.createLinearGradient(ex, ey - openH, ex, ey + openH);
-    scleraGrad.addColorStop(0, "#d9dde8");
-    scleraGrad.addColorStop(0.35, "#f7f8fc");
-    scleraGrad.addColorStop(1, "#eceef5");
+    scleraGrad.addColorStop(0, "#c9cdd3");
+    scleraGrad.addColorStop(0.4, "#eceae6");
+    scleraGrad.addColorStop(1, "#dcd9d4");
     ctx.fillStyle = scleraGrad;
     ctx.fill();
     ctx.clip();
@@ -1853,13 +1938,9 @@ function drawExpressiveFace(ctx, x0, y0, boxW, boxH, nowMs) {
     ctx.fill();
 
     // Dual corneal catchlights
-    ctx.fillStyle = "rgba(255,255,255,0.94)";
+    ctx.fillStyle = "rgba(255,255,255,0.82)";
     ctx.beginPath();
-    ctx.arc(ix - 1.8, iy - 1.9, 1.4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.beginPath();
-    ctx.arc(ix + 1.9, iy + 1.6, 0.75, 0, Math.PI * 2);
+    ctx.arc(ix - 1.7, iy - 1.8, 1.15, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
@@ -1871,8 +1952,8 @@ function drawExpressiveFace(ctx, x0, y0, boxW, boxH, nowMs) {
     ctx.quadraticCurveTo(ex, ey + openH * 1.18, ex + 10.5, ey + 0.8);
     ctx.stroke();
 
-    ctx.strokeStyle = "#1a1620";
-    ctx.lineWidth = isFem ? 2.3 : 1.75;
+    ctx.strokeStyle = "#3a2a2c";
+    ctx.lineWidth = isFem ? 1.9 : 1.35;
     ctx.lineCap = "round";
     ctx.beginPath();
     ctx.moveTo(ex - 11.8, ey + 0.6);
@@ -1959,7 +2040,7 @@ function drawExpressiveFace(ctx, x0, y0, boxW, boxH, nowMs) {
 
   // Subtle amber nasal glow at nostrils when velum is open (/m, n, ng/)
   if (anim.velum > 0.12 && anim.voicing > 0.1) {
-    ctx.fillStyle = `rgba(251, 191, 36, ${Math.min(0.55, anim.velum * 0.5)})`;
+    ctx.fillStyle = `rgba(242, 184, 75, ${Math.min(0.5, anim.velum * 0.45)})`;
     ctx.beginPath();
     ctx.ellipse(-4.8, 11.5, 3.4, 1.9, 0, 0, Math.PI * 2);
     ctx.ellipse(4.8, 11.5, 3.4, 1.9, 0, 0, Math.PI * 2);
@@ -2051,8 +2132,8 @@ function drawExpressiveFace(ctx, x0, y0, boxW, boxH, nowMs) {
   }
 
   // Sculpted Upper Lip (Cupid's bow) & Lower Vermilion Cushion
-  const lipBase = isFem ? "#d86478" : "#be6b75";
-  const lipDark = isFem ? "#a84256" : "#944b56";
+  const lipBase = isFem ? "#cf6a78" : "#bb7f7a";
+  const lipDark = isFem ? "#a64c5b" : "#9a605d";
   const upperThick = 4.6 + roundAmt * 2.2 - spreadAmt * 0.8;
 
   // Upper lip
@@ -2107,8 +2188,8 @@ function drawExpressiveFace(ctx, x0, y0, boxW, boxH, nowMs) {
       const r = halfW + 8 + u * 22;
       const alpha = (1 - u) * Math.min(0.45, anim.energy * 0.5);
       ctx.strokeStyle = isWhispering
-        ? `rgba(148, 163, 184, ${alpha})`
-        : `rgba(56, 189, 248, ${alpha})`;
+        ? `rgba(191, 227, 245, ${alpha})`
+        : `rgba(242, 184, 75, ${alpha})`;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(0, my, r, -0.45, 0.45);
@@ -2129,8 +2210,8 @@ function drawMidsagittalTract(ctx, x0, y0, boxW, boxH) {
   ctx.rect(x0, y0, boxW, boxH);
   ctx.clip();
 
-  // Subtle technical grid backdrop
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.035)";
+  // Faint measuring grid
+  ctx.strokeStyle = FILM.grid;
   ctx.lineWidth = 1;
   const step = Math.max(18, Math.round(boxH / 8));
   for (let gx = x0 + step; gx < x0 + boxW; gx += step) {
@@ -2174,11 +2255,11 @@ function drawMidsagittalTract(ctx, x0, y0, boxW, boxH) {
 
   // 1. Complete Side-Profile Human Head & Neck Silhouette (X-Ray cutaway)
   const headFill = ctx.createRadialGradient(135, 76, 18, 135, 86, 118);
-  headFill.addColorStop(0, "rgba(148, 163, 184, 0.05)");
-  headFill.addColorStop(0.75, "rgba(148, 163, 184, 0.11)");
-  headFill.addColorStop(1, "rgba(100, 116, 139, 0.18)");
+  headFill.addColorStop(0, "rgba(196, 220, 238, 0.05)");
+  headFill.addColorStop(0.75, "rgba(196, 220, 238, 0.10)");
+  headFill.addColorStop(1, "rgba(196, 220, 238, 0.17)");
   ctx.fillStyle = headFill;
-  ctx.strokeStyle = "rgba(186, 204, 226, 0.34)";
+  ctx.strokeStyle = "rgba(203, 221, 235, 0.44)";
   ctx.lineWidth = 1.7;
   ctx.lineJoin = "round";
   ctx.beginPath();
@@ -2205,7 +2286,7 @@ function drawMidsagittalTract(ctx, x0, y0, boxW, boxH) {
   ctx.stroke();
 
   // Subtle side-profile eye indicator for anatomical orientation
-  ctx.strokeStyle = "rgba(186, 204, 226, 0.28)";
+  ctx.strokeStyle = "rgba(203, 221, 235, 0.3)";
   ctx.lineWidth = 1.2;
   ctx.beginPath();
   ctx.moveTo(74, 34);
@@ -2214,9 +2295,9 @@ function drawMidsagittalTract(ctx, x0, y0, boxW, boxH) {
 
   // 2. Nasal Cavity Chamber + Velopharyngeal Resonance Stream
   ctx.fillStyle = velum > 0.06
-    ? `rgba(245, 158, 11, ${0.10 + velum * 0.34})`
-    : "rgba(30, 41, 59, 0.55)";
-  ctx.strokeStyle = velum > 0.12 ? "rgba(251, 191, 36, 0.65)" : "rgba(148, 163, 184, 0.28)";
+    ? `rgba(242, 184, 75, ${0.08 + velum * 0.3})`
+    : "rgba(7, 13, 19, 0.5)";
+  ctx.strokeStyle = velum > 0.12 ? "rgba(242, 184, 75, 0.7)" : "rgba(203, 221, 235, 0.26)";
   ctx.lineWidth = 1.6;
   ctx.beginPath();
   ctx.moveTo(58, 62);
@@ -2233,7 +2314,7 @@ function drawMidsagittalTract(ctx, x0, y0, boxW, boxH) {
       const u = (anim.wavePhase + k * 0.33) % 1;
       const wx = 54 - u * 22;
       const wy = 63 + u * 4;
-      ctx.strokeStyle = `rgba(251, 191, 36, ${(1 - u) * velum * 0.65})`;
+      ctx.strokeStyle = `rgba(242, 184, 75, ${(1 - u) * velum * 0.65})`;
       ctx.lineWidth = 1.6;
       ctx.beginPath();
       ctx.arc(wx, wy, 4 + u * 9, Math.PI * 0.72, Math.PI * 1.32);
@@ -2242,8 +2323,8 @@ function drawMidsagittalTract(ctx, x0, y0, boxW, boxH) {
   }
 
   // 3. Posterior Pharyngeal Wall + Hard Palate + Soft Palate (Velum Valve)
-  ctx.strokeStyle = "#cbd5e1";
-  ctx.lineWidth = 3.2;
+  ctx.strokeStyle = FILM.bone;
+  ctx.lineWidth = 3;
   ctx.lineCap = "round";
   ctx.beginPath();
   ctx.moveTo(198, 170);
@@ -2252,11 +2333,11 @@ function drawMidsagittalTract(ctx, x0, y0, boxW, boxH) {
 
   // Shaded Hard Palate & Alveolar Ridge Vault
   const palGrad = ctx.createLinearGradient(70, 44, 164, 62);
-  palGrad.addColorStop(0, "rgba(226, 168, 152, 0.42)");
-  palGrad.addColorStop(1, "rgba(192, 122, 116, 0.32)");
+  palGrad.addColorStop(0, "rgba(219, 231, 240, 0.34)");
+  palGrad.addColorStop(1, "rgba(219, 231, 240, 0.18)");
   ctx.fillStyle = palGrad;
-  ctx.strokeStyle = "#e2b6a7";
-  ctx.lineWidth = 2.6;
+  ctx.strokeStyle = FILM.bone;
+  ctx.lineWidth = 2.4;
   ctx.beginPath();
   ctx.moveTo(70, 68);
   ctx.quadraticCurveTo(84, 52, 116, 46); // alveolar dome -> palatal vault
@@ -2272,9 +2353,9 @@ function drawMidsagittalTract(ctx, x0, y0, boxW, boxH) {
   const velDrop = velum * 15;
   const velTipX = 196 - velum * 16;
   const velTipY = 66 + velDrop;
-  ctx.fillStyle = velum > 0.12 ? "rgba(251, 191, 36, 0.35)" : "rgba(226, 168, 152, 0.40)";
-  ctx.strokeStyle = velum > 0.12 ? "#fbbf24" : "#e2b6a7";
-  ctx.lineWidth = 2.8;
+  ctx.fillStyle = velum > 0.12 ? "rgba(240, 102, 138, 0.42)" : "rgba(240, 102, 138, 0.24)";
+  ctx.strokeStyle = velum > 0.12 ? FILM.rose : "rgba(240, 102, 138, 0.72)";
+  ctx.lineWidth = 2.6;
   ctx.beginPath();
   ctx.moveTo(158, 48);
   ctx.quadraticCurveTo(182, 50 + velDrop * 0.4, velTipX, velTipY);
@@ -2285,8 +2366,8 @@ function drawMidsagittalTract(ctx, x0, y0, boxW, boxH) {
   ctx.stroke();
 
   // 4. Upper & Lower Central Incisors (enamel ivory)
-  ctx.fillStyle = "#f5f4ef";
-  ctx.strokeStyle = "rgba(148, 163, 184, 0.5)";
+  ctx.fillStyle = "#f4f9fc";
+  ctx.strokeStyle = "rgba(203, 221, 235, 0.5)";
   ctx.lineWidth = 1;
   // Upper incisor
   ctx.beginPath();
@@ -2314,7 +2395,7 @@ function drawMidsagittalTract(ctx, x0, y0, boxW, boxH) {
     for (let k = 0; k < 4; k++) {
       const u = (anim.wavePhase + k * 0.25) % 1;
       const alpha = (1 - u) * Math.min(0.45, anim.voicing * 0.48);
-      ctx.strokeStyle = `rgba(45, 212, 191, ${alpha})`;
+      ctx.strokeStyle = `rgba(242, 184, 75, ${alpha})`;
       ctx.lineWidth = 1.6;
       // Radiating past the lips
       const rx = 56 - lipProtrude - u * 34;
@@ -2334,13 +2415,13 @@ function drawMidsagittalTract(ctx, x0, y0, boxW, boxH) {
   const tipY = 97 + jawDrop * 0.62 - tTip * 37;
 
   const tGrad = ctx.createRadialGradient(132, 124 + jawDrop * 0.3, 8, 128, 118, 68);
-  tGrad.addColorStop(0, "rgba(251, 133, 162, 0.62)");
-  tGrad.addColorStop(0.7, "rgba(236, 92, 133, 0.44)");
-  tGrad.addColorStop(1, "rgba(180, 58, 94, 0.34)");
+  tGrad.addColorStop(0, "rgba(244, 128, 158, 0.6)");
+  tGrad.addColorStop(0.7, "rgba(240, 102, 138, 0.42)");
+  tGrad.addColorStop(1, "rgba(184, 62, 98, 0.32)");
 
   ctx.fillStyle = tGrad;
-  ctx.strokeStyle = "#f472b6";
-  ctx.lineWidth = 2.8;
+  ctx.strokeStyle = FILM.rose;
+  ctx.lineWidth = 2.6;
   ctx.lineJoin = "round";
   ctx.beginPath();
   ctx.moveTo(176, 154); // tongue root above larynx
@@ -2361,9 +2442,9 @@ function drawMidsagittalTract(ctx, x0, y0, boxW, boxH) {
   ctx.stroke();
 
   // 7. Upper & Lower Lip Vermilion Cushions (Sagittal Profile)
-  ctx.fillStyle = "rgba(251, 113, 133, 0.72)";
-  ctx.strokeStyle = "#fb7185";
-  ctx.lineWidth = 2.2;
+  ctx.fillStyle = "rgba(240, 102, 138, 0.62)";
+  ctx.strokeStyle = FILM.rose;
+  ctx.lineWidth = 2;
   // Upper lip cushion
   ctx.beginPath();
   ctx.ellipse(63 - lipProtrude, upperLipY - 2.5, 6.5 + lipR * 2.5, 4.5, -0.2, 0, Math.PI * 2);
@@ -2386,7 +2467,7 @@ function drawMidsagittalTract(ctx, x0, y0, boxW, boxH) {
     : (voice?.settings.whisper ? 2.6 : 0.8);
   const foldGap = Math.max(0.4, 1.6 + foldVib + anim.noise * 1.8);
 
-  ctx.fillStyle = anim.voicing > 0.06 ? "#2dd4bf" : "#94a3b8";
+  ctx.fillStyle = anim.voicing > 0.06 ? FILM.gold : "rgba(203, 221, 235, 0.6)";
   ctx.beginPath();
   ctx.roundRect(glotX - 8 - foldGap * 0.5, glotY - 3, 6.5, 6, 2.5);
   ctx.roundRect(glotX + 1.5 + foldGap * 0.5, glotY - 3, 6.5, 6, 2.5);
@@ -2394,8 +2475,8 @@ function drawMidsagittalTract(ctx, x0, y0, boxW, boxH) {
 
   if (anim.voicing > 0.06) {
     const gGlow = ctx.createRadialGradient(glotX, glotY, 1, glotX, glotY, 16);
-    gGlow.addColorStop(0, `rgba(45, 212, 191, ${Math.min(0.65, anim.voicing * 0.65)})`);
-    gGlow.addColorStop(1, "rgba(45, 212, 191, 0)");
+    gGlow.addColorStop(0, `rgba(242, 184, 75, ${Math.min(0.65, anim.voicing * 0.65)})`);
+    gGlow.addColorStop(1, "rgba(242, 184, 75, 0)");
     ctx.fillStyle = gGlow;
     ctx.beginPath();
     ctx.arc(glotX, glotY, 16, 0, Math.PI * 2);
@@ -2408,18 +2489,18 @@ function drawMidsagittalTract(ctx, x0, y0, boxW, boxH) {
     if (!p.active) continue;
     const u = p.life / p.maxLife;
     const alpha = Math.sin(u * Math.PI) * Math.min(0.85, 0.25 + anim.noise * 0.75);
-    ctx.fillStyle = `rgba(186, 230, 253, ${alpha})`;
+    ctx.fillStyle = `rgba(191, 227, 245, ${alpha})`;
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // Subtle anatomical callouts
-  ctx.fillStyle = "rgba(203, 213, 225, 0.42)";
-  ctx.font = "600 8.5px system-ui, sans-serif";
-  ctx.fillText("NASAL", 108, 39);
-  ctx.fillText("VELUM", 203, 66);
-  ctx.fillText("FOLDS", 202, 161);
+  // What is what
+  ctx.fillStyle = FILM.label;
+  ctx.font = `8.5px ${UI_FONT}`;
+  ctx.fillText("nasal cavity", 104, 40);
+  ctx.fillText("velum", 203, 66);
+  ctx.fillText("vocal folds", 202, 161);
 
   ctx.restore();
 }
@@ -2436,10 +2517,10 @@ function renderVocalTract(_unusedSlice = null, nowMs = performance.now()) {
   }
   const ctx = canvas.getContext("2d");
 
-  // Studio dark vignette background
+  // Film base
   const bg = ctx.createLinearGradient(0, 0, 0, h);
-  bg.addColorStop(0, "#10141f");
-  bg.addColorStop(1, "#0a0c12");
+  bg.addColorStop(0, "#0e1a25");
+  bg.addColorStop(1, FILM.base);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, w, h);
 
@@ -2452,8 +2533,8 @@ function renderVocalTract(_unusedSlice = null, nowMs = performance.now()) {
     drawExpressiveFace(ctx, 0, 0, leftW, h, nowMs);
     drawMidsagittalTract(ctx, leftW, 0, w - leftW, h);
 
-    // Subtle divider line
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+    // Where the camera view ends and the X-ray begins
+    ctx.strokeStyle = FILM.line;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(leftW, 12 * dpr);
@@ -2461,6 +2542,8 @@ function renderVocalTract(_unusedSlice = null, nowMs = performance.now()) {
     ctx.stroke();
   }
 }
+
+let shownProgress = "0";
 
 function startStageLoop() {
   const frame = (nowMs) => {
@@ -2472,9 +2555,18 @@ function startStageLoop() {
         activeT = scrubTimeSec;
       }
 
+      // the Speak button fills as the audio plays
+      const progress = isPlaying && lastSpeech && lastSpeech.duration > 0
+        ? Math.min(100, Math.max(0, (activeT / lastSpeech.duration) * 100)).toFixed(1)
+        : "0";
+      if (progress !== shownProgress) {
+        shownProgress = progress;
+        $("speak").style.setProperty("--progress", `${progress}%`);
+      }
+
       if (activeT >= 0 && lastSpeech) {
         const clampedT = Math.min(activeT, lastSpeech.duration);
-        $("timeReadout").textContent = `${clampedT.toFixed(2)}s / ${lastSpeech.duration.toFixed(2)}s`;
+        setText($("timeReadout"), `${clampedT.toFixed(2)} / ${lastSpeech.duration.toFixed(2)} s`);
         const sampled = sampleSpeechAt(lastSpeech, activeT);
         stepStagePhysics(nowMs, sampled);
         updateLiveBadges(
@@ -2484,7 +2576,8 @@ function startStageLoop() {
           anim.f0,
           anim.voicing,
           sampled?.segVoice || "",
-          Boolean(sampled?.segSinging)
+          Boolean(sampled?.segSinging),
+          sampled?.segSound || ""
         );
 
         const spans = $("words").querySelectorAll("span[data-idx]");
@@ -2534,12 +2627,12 @@ function drawVowelSpace() {
     canvas.height = h;
   }
   const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "#0c0e13";
+  ctx.fillStyle = FILM.base;
   ctx.fillRect(0, 0, w, h);
 
   // Vowel trapezoid guide
-  ctx.strokeStyle = "rgba(255,255,255,0.11)";
-  ctx.lineWidth = 1.2 * dpr;
+  ctx.strokeStyle = "rgba(203, 221, 235, 0.2)";
+  ctx.lineWidth = 1 * dpr;
   ctx.beginPath();
   ctx.moveTo(0.12 * w, 0.14 * h);
   ctx.lineTo(0.84 * w, 0.14 * h);
@@ -2548,11 +2641,14 @@ function drawVowelSpace() {
   ctx.closePath();
   ctx.stroke();
 
-  ctx.fillStyle = "rgba(255,255,255,0.38)";
-  ctx.font = `${10.5 * dpr}px system-ui, sans-serif`;
-  ctx.fillText("← Front (high F2)", 10 * dpr, 14 * dpr);
-  ctx.fillText("Back (low F2) →", w - 92 * dpr, 14 * dpr);
-  ctx.fillText("Open (high F1)", 10 * dpr, h - 8 * dpr);
+  // tongue forward on the left, mouth open at the bottom, as vowel charts are drawn
+  ctx.fillStyle = FILM.label;
+  ctx.font = `${11 * dpr}px ${UI_FONT}`;
+  ctx.fillText("front", 10 * dpr, 15 * dpr);
+  ctx.textAlign = "right";
+  ctx.fillText("back", w - 10 * dpr, 15 * dpr);
+  ctx.textAlign = "left";
+  ctx.fillText("open", 10 * dpr, h - 9 * dpr);
 
   for (const name of TTS.vowelNames()) {
     if (!VOWEL_INFO[name]) continue;
@@ -2566,7 +2662,7 @@ function drawVowelSpace() {
       const padY = 24;
       const bx = padX + VOWEL_INFO[name].x * (w - 2 * padX);
       const by = padY + VOWEL_INFO[name].y * (h - 2 * padY);
-      ctx.strokeStyle = "rgba(251, 191, 36, 0.45)";
+      ctx.strokeStyle = "rgba(242, 184, 75, 0.55)";
       ctx.lineWidth = 1.2 * dpr;
       ctx.beginPath();
       ctx.moveTo(bx, by);
@@ -2575,16 +2671,16 @@ function drawVowelSpace() {
     }
 
     ctx.beginPath();
-    ctx.arc(x, y, (isSel ? 8.5 : 6.5) * dpr, 0, Math.PI * 2);
-    ctx.fillStyle = isSel ? "#529dff" : shifted ? "#f59e0b" : "rgba(148, 163, 184, 0.35)";
+    ctx.arc(x, y, (isSel ? 7 : 5) * dpr, 0, Math.PI * 2);
+    ctx.fillStyle = isSel ? FILM.rose : shifted ? FILM.gold : "rgba(203, 221, 235, 0.3)";
     ctx.fill();
-    ctx.strokeStyle = isSel ? "#ffffff" : "rgba(255,255,255,0.55)";
-    ctx.lineWidth = 1.3 * dpr;
+    ctx.strokeStyle = isSel ? "#ffffff" : "rgba(219, 231, 240, 0.7)";
+    ctx.lineWidth = 1.2 * dpr;
     ctx.stroke();
 
-    ctx.fillStyle = "#f8fafc";
-    ctx.font = `600 ${11 * dpr}px system-ui, sans-serif`;
-    ctx.fillText(VOWEL_INFO[name].ipa, x + 9 * dpr, y + 4 * dpr);
+    ctx.fillStyle = FILM.bone;
+    ctx.font = `${14 * dpr}px ${IPA_FONT}`;
+    ctx.fillText(VOWEL_INFO[name].ipa, x + 10 * dpr, y + 4.5 * dpr);
   }
 }
 
@@ -2620,7 +2716,7 @@ function setupVowelCanvasInteraction() {
     moved = false;
     canvas.setPointerCapture(e.pointerId);
     const [m1, m2] = getVowelMult(best);
-    $("vowelReadout").textContent = `${best} /${VOWEL_INFO[best].ipa}/ ("${VOWEL_INFO[best].word}"): F1 ×${m1.toFixed(2)}, F2 ×${m2.toFixed(2)}`;
+    $("vowelReadout").textContent = `/${VOWEL_INFO[best].ipa}/ as in "${VOWEL_INFO[best].word}": F1 ×${m1.toFixed(2)}, F2 ×${m2.toFixed(2)}`;
     drawVowelSpace();
   });
 
@@ -2635,7 +2731,7 @@ function setupVowelCanvasInteraction() {
     const m1 = Math.max(0.7, Math.min(1.35, 1 + (ny - info.y) / 0.85));
     const [, , m3] = getVowelMult(dragging);
     voice.configure({ vowels: { [dragging]: [m1, m2, m3] } });
-    $("vowelReadout").textContent = `${dragging} /${info.ipa}/ ("${info.word}"): F1 ×${m1.toFixed(2)}, F2 ×${m2.toFixed(2)}`;
+    $("vowelReadout").textContent = `/${info.ipa}/ as in "${info.word}": F1 ×${m1.toFixed(2)}, F2 ×${m2.toFixed(2)}`;
     markCustomCard();
     drawVowelSpace();
   });
@@ -2661,11 +2757,12 @@ function stopPlayback(clearCompare = true) {
   isPlaying = false;
   scrubTimeSec = -1;
   $("stop").disabled = true;
+  document.documentElement.removeAttribute("data-playing");
   updateLiveBadges("", "", "", 0, 0);
   for (const el of $("words").querySelectorAll("span[data-idx]")) el.classList.remove("on");
   if (lastSpeech) {
     renderAcousticFrame(-1);
-    $("timeReadout").textContent = `0.00s / ${lastSpeech.duration.toFixed(2)}s`;
+    $("timeReadout").textContent = `0.00 / ${lastSpeech.duration.toFixed(2)} s`;
   }
 }
 
@@ -2681,12 +2778,105 @@ function previewShortPhrase(phrase) {
   playBufferFrom(sp, 0);
 }
 
+// ============================================================================
+// Laughs and the other sounds that are not words
+// ============================================================================
+const SOUND_LABELS = new Map();
+const SOUND_GROUP_NAMES = {
+  laughter: "Laughter",
+  breath: "Breath",
+  reaction: "Reactions",
+  voice: "Voice",
+  mouth: "Mouth",
+  body: "Body",
+};
+const SOUND_QUICK = ["laugh", "chuckle", "giggle", "sigh", "gasp", "hmm", "cough", "whistle"];
+
+// Plays one sound on its own in the voice of the Voice panel, and shows it on the stage.
+function auditionSound(id) {
+  stopPlayback(true);
+  clearStickySegment();
+  audioCtx ??= new AudioContext();
+  audioCtx.resume();
+  let sp;
+  try {
+    sp = voice.sound(id);
+  } catch (err) {
+    $("status").textContent = `That sound could not be made: ${err.message || err}`;
+    return;
+  }
+  if (!sp.samples.length) return;
+  lastSpeech = sp;
+  buildAcousticCache(sp);
+  renderTranscriptWords(sp);
+  $("ipa").textContent = "";
+  $("status").textContent = `[${id}] ${SOUND_LABELS.get(id) || id}, ${sp.duration.toFixed(2)} s in this voice.`;
+  playBufferFrom(sp, 0);
+}
+
+function insertTagAtCursor(tag) {
+  const ta = $("text");
+  const start = ta.selectionStart ?? ta.value.length;
+  const end = ta.selectionEnd ?? ta.value.length;
+  ta.value = ta.value.slice(0, start) + tag + ta.value.slice(end);
+  ta.focus();
+  ta.selectionStart = ta.selectionEnd = start + tag.length;
+  if (studioMode === "script") savedScriptText = ta.value;
+  updateLivePhonetics();
+  updateApiSnippet();
+}
+
+function buildSoundPalette() {
+  const sounds = TTS.sounds();
+  for (const snd of sounds) SOUND_LABELS.set(snd.id, snd.label);
+  const pill = (snd) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "tag-pill";
+    btn.textContent = snd.id;
+    btn.title = `${snd.label}: ${snd.about}`;
+    btn.onclick = () => {
+      insertTagAtCursor(`[${snd.id}] `);
+      if ($("soundHearCheck").checked) auditionSound(snd.id);
+    };
+    return btn;
+  };
+  $("soundQuick").replaceChildren(...SOUND_QUICK.map((id) => sounds.find((x) => x.id === id)).filter(Boolean).map(pill));
+  const groups = [];
+  for (const [key, name] of Object.entries(SOUND_GROUP_NAMES)) {
+    const members = sounds.filter((x) => x.group === key);
+    if (!members.length) continue;
+    const row = document.createElement("div");
+    row.className = "sound-group";
+    const label = document.createElement("span");
+    label.className = "dir-label";
+    label.textContent = name;
+    const pills = document.createElement("div");
+    pills.className = "sound-pills";
+    pills.append(...members.map(pill));
+    row.append(label, pills);
+    groups.push(row);
+  }
+  const note = document.createElement("p");
+  note.className = "field-note sound-note";
+  note.innerHTML = "Made by whoever is speaking at that point. Stronger: <code>[laugh=strong]</code>. For a set time: <code>[laugh=3s]</code>, <code>[sigh=1.5s]</code>. To laugh while speaking, use the delivery <code>[laughing]</code>.";
+  $("soundPalette").replaceChildren(...groups, note);
+  $("soundMoreBtn").textContent = `All ${sounds.length} sounds`;
+  $("soundMoreBtn").onclick = () => {
+    const open = $("soundPalette").hidden;
+    $("soundPalette").hidden = !open;
+    $("soundMoreBtn").setAttribute("aria-expanded", String(open));
+    $("soundMoreBtn").textContent = open ? "Fewer" : `All ${sounds.length} sounds`;
+  };
+}
+
 function renderTranscriptWords(speech) {
   const nodes = speech.words.flatMap((w, i) => {
     const span = document.createElement("span");
     span.textContent = w.word;
+    if (w.word.startsWith("[")) span.classList.add("is-sound");
     span.dataset.idx = String(i);
-    span.title = `${w.start.toFixed(2)}s – ${w.end.toFixed(2)}s (${Math.round((w.end - w.start) * 1000)} ms) · Click to play from here`;
+    span.title = `${w.start.toFixed(2)} to ${w.end.toFixed(2)} s. Click to play from here.`;
     span.onclick = () => playBufferFrom(speech, w.start);
     return [span, " "];
   });
@@ -2712,6 +2902,7 @@ function playBufferFrom(speech, offsetSec = 0) {
   playOffsetSec = clampedOffset;
   isPlaying = true;
   $("stop").disabled = false;
+  document.documentElement.setAttribute("data-playing", "");
 
   sourceNode.start(startAt, clampedOffset);
   sourceNode.onended = () => {
@@ -2765,7 +2956,7 @@ function synthesizeCurrentText(labelPrefix = "") {
       speech = voice.speak($("text").value);
     }
   } catch (err) {
-    $("status").textContent = `Syntax error: ${err.message || err}`;
+    $("status").textContent = `The ${studioMode === "sing" ? "score" : "script"} could not be read: ${err.message || err}`;
     return null;
   }
   const ms = Math.max(0.2, performance.now() - t0);
@@ -2773,7 +2964,7 @@ function synthesizeCurrentText(labelPrefix = "") {
   $("download").disabled = speech.samples.length === 0;
 
   if (speech.samples.length === 0) {
-    $("status").textContent = "Nothing pronounceable to render.";
+    $("status").textContent = "Nothing to say yet. Type some words first.";
     return null;
   }
 
@@ -2787,12 +2978,14 @@ function synthesizeCurrentText(labelPrefix = "") {
   }
 
   const rtf = Math.round(speech.duration / (ms / 1000));
-  $("perfBadge").textContent = `24 kHz · ${rtf}× real-time`;
+  $("perfBadge").textContent = `24 kHz mono, ${rtf}× real time`;
   const modeDesc = studioMode === "sing"
-    ? (singSubView === "chorus" ? `${chorusPartsState.filter((p) => p.active).length}-part chorus` : "Sung melody")
-    : (speech.segments && speech.segments.length > 1 ? `${speech.segments.length} scripted cues` : (voice.settings.folds ? "Simulated folds" : "LF pulse"));
-  $("status").textContent = `${labelPrefix}${speech.duration.toFixed(2)} s rendered in ${ms.toFixed(1)} ms (${rtf}× real-time · ${modeDesc})`;
-  $("ipa").textContent = phoneticMode === "ipa" || studioMode !== "speech" ? speech.ipa : voice.arpabet($("text").value);
+    ? (singSubView === "chorus" ? `${chorusPartsState.filter((p) => p.active).length}-part chorus` : "sung melody")
+    : (speech.segments && speech.segments.length > 1 ? `${speech.segments.length} script cues` : (voice.settings.folds ? "simulated folds" : "equation pulse"));
+  $("status").textContent = `${labelPrefix}${speech.duration.toFixed(2)} s rendered in ${ms.toFixed(1)} ms, ${rtf}× real time (${modeDesc})`;
+  const showIpa = phoneticMode === "ipa" || studioMode !== "speech";
+  $("ipa").classList.toggle("arpa", !showIpa);
+  $("ipa").textContent = showIpa ? speech.ipa : voice.arpabet($("text").value);
 
   renderTranscriptWords(speech);
   buildAcousticCache(speech);
@@ -2811,20 +3004,20 @@ function runFoldComparison() {
   const originalFolds = voice.settings.folds;
   voice.configure({ folds: false });
   syncControls();
-  const spEq = synthesizeCurrentText("[1/2 LF Equation Pulse] ");
+  const spEq = synthesizeCurrentText("Equation pulse, 1 of 2: ");
   if (!spEq) return;
 
   compareQueue = [
     () => {
       voice.configure({ folds: true });
       syncControls();
-      const spFolds = synthesizeCurrentText("[2/2 Simulated 2-Mass Folds] ");
+      const spFolds = synthesizeCurrentText("Simulated folds, 2 of 2: ");
       compareQueue = [
         () => {
           voice.configure({ folds: originalFolds });
           syncControls();
           stopPlayback();
-          $("status").textContent = "Finished A/B comparison (LF Equation Pulse → Simulated Vocal Folds).";
+          $("status").textContent = "Compared: the equation pulse, then the simulated folds.";
         },
       ];
       if (spFolds) playBufferFrom(spFolds, 0);
@@ -2848,7 +3041,7 @@ function updateCustomWordInspector() {
   if (!document.activeElement || document.activeElement !== $("customPhonesInput")) {
     $("customPhonesInput").value = arpa;
   }
-  $("customWordPreview").textContent = `Current: ${word} → ${ipa}  [${arpa}]`;
+  $("customWordPreview").textContent = `Said ${ipa} at the moment.`;
 }
 
 function renderTaughtWords() {
@@ -2859,7 +3052,7 @@ function renderTaughtWords() {
     pill.className = "cw-pill";
     pill.innerHTML = `<b>${w}</b> <code>${phones}</code>`;
     pill.style.cursor = "pointer";
-    pill.title = "Click to audition";
+    pill.title = "Click to hear it";
     pill.onclick = () => previewShortPhrase(w);
     host.append(pill);
   }
@@ -2893,6 +3086,18 @@ async function main() {
   $("modeSpeechBtn").onclick = () => setStudioMode("speech");
   $("modeScriptBtn").onclick = () => setStudioMode("script");
   $("modeSingBtn").onclick = () => setStudioMode("sing");
+
+  buildSoundPalette();
+
+  // Words the letter-to-sound rules get wrong, with what they should be
+  for (const btn of document.querySelectorAll("#wordExamples .chip")) {
+    btn.onclick = () => {
+      $("customWordInput").value = btn.dataset.word;
+      updateCustomWordInspector();
+      $("customPhonesInput").value = btn.dataset.phones;
+      $("customWordPreview").textContent += ` Teach it as ${btn.dataset.phones}, then hear it again.`;
+    };
+  }
 
   // Script director inline tag palette
   for (const btn of document.querySelectorAll("#scriptToolbar .tag-pill")) {
@@ -2934,9 +3139,9 @@ async function main() {
 
   $("copyApiSnippetBtn").onclick = async () => {
     await navigator.clipboard.writeText($("apiSnippetBox").textContent);
-    $("copyApiSnippetBtn").textContent = "✓ Copied!";
+    $("copyApiSnippetBtn").textContent = "Copied";
     setTimeout(() => {
-      $("copyApiSnippetBtn").textContent = "Copy Live Snippet";
+      $("copyApiSnippetBtn").textContent = "Copy snippet";
     }, 1500);
   };
 
@@ -2945,7 +3150,7 @@ async function main() {
   if (initialSpeech.samples.length > 0) {
     lastSpeech = initialSpeech;
     $("download").disabled = false;
-    $("timeReadout").textContent = `0.00s / ${initialSpeech.duration.toFixed(2)}s`;
+    $("timeReadout").textContent = `0.00 / ${initialSpeech.duration.toFixed(2)} s`;
     renderTranscriptWords(initialSpeech);
     buildAcousticCache(initialSpeech);
     renderAcousticFrame(-1);
@@ -2961,15 +3166,18 @@ async function main() {
     $("stageModeLabel").textContent = label;
     renderVocalTract();
   };
-  $("animSplitBtn").onclick = () => setAnimMode("split", "Expressive Avatar + Midsagittal X-Ray");
-  $("animFaceBtn").onclick = () => setAnimMode("face", "Expressive Speaking Avatar");
-  $("animTractBtn").onclick = () => setAnimMode("tract", "Midsagittal X-Ray Vocal Tract");
+  $("animSplitBtn").onclick = () => setAnimMode("split", "Speaker and vocal tract side by side");
+  $("animFaceBtn").onclick = () => setAnimMode("face", "The speaker's face");
+  $("animTractBtn").onclick = () => setAnimMode("tract", "Side view through the vocal tract");
 
   // Theme & Tabs
   $("themeBtn").onclick = cycleTheme;
   for (const btn of document.querySelectorAll(".tab-btn")) {
     btn.onclick = () => {
-      for (const b of document.querySelectorAll(".tab-btn")) b.classList.toggle("active", b === btn);
+      for (const b of document.querySelectorAll(".tab-btn")) {
+        b.classList.toggle("active", b === btn);
+        b.setAttribute("aria-selected", String(b === btn));
+      }
       for (const pane of document.querySelectorAll(".tab-pane")) {
         pane.classList.toggle("active", pane.id === btn.dataset.tab);
       }
@@ -2992,13 +3200,8 @@ async function main() {
   };
 
   const updateVizLabel = () => {
-    if (vizMode === "spec") {
-      $("vizModeLabel").textContent = showFormants
-        ? "0–8 kHz Spectrogram · Cyan = F0 · Dotted = F1–F3"
-        : "0–8 kHz Spectrogram · Cyan = Pitch (F0)";
-    } else {
-      $("vizModeLabel").textContent = "Waveform Envelope · Cyan = Pitch (F0)";
-    }
+    $("vizModeLabel").textContent = vizMode === "spec" ? "Spectrogram, 0 to 8 kHz" : "Waveform";
+    $("legendFormants").hidden = !(vizMode === "spec" && showFormants);
   };
 
   $("toggleFormantsBtn").onclick = () => {
@@ -3082,7 +3285,7 @@ async function main() {
     updateLivePhonetics();
     updateApiSnippet();
   });
-  $("text").addEventListener("keydown", (e) => {
+  document.querySelector(".composer").addEventListener("keydown", (e) => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       speak(0);
@@ -3111,7 +3314,7 @@ async function main() {
     baseSettingsSnapshot = structuredCloneSettings(prof);
     syncControls("");
     const nextIdx = pinnedVoiceCounter + 1;
-    $("profileStatus").textContent = `Randomized ${prof.gender} voice (${Math.round(prof.pitchHz)} Hz · ${prof.tractLengthCm.toFixed(1)} cm · warmth ${prof.warmth.toFixed(2)}). Click "+ Pin Voice" to save as [voice_${nextIdx}]!`;
+    $("profileStatus").textContent = `A new ${prof.gender} voice: ${Math.round(prof.pitchHz)} Hz, ${prof.tractLengthCm.toFixed(1)} cm tract. Pin it to keep it as [voice_${nextIdx}].`;
     updateApiSnippet();
     speak(0);
   };
@@ -3127,16 +3330,14 @@ async function main() {
     card.type = "button";
     card.className = "voice-card active";
     card.dataset.cardId = id;
-    card.innerHTML = `
-      <span class="vc-name">★ ${label}</span>
-      <span class="vc-meta">${saved.gender[0].toUpperCase()} · ${Math.round(saved.pitchHz)} Hz · [${id}]</span>
-    `;
+    card.innerHTML = voiceCardHtml(label, [`${Math.round(saved.pitchHz)} Hz`, saved.gender], saved.pitchHz);
+    card.title = `Use as [${id}] in dialogue and chorus`;
     card.onclick = () => {
       clearStickySegment();
       voice.configure(id);
       baseSettingsSnapshot = structuredCloneSettings(voice.settings);
       syncControls(id);
-      $("profileStatus").textContent = `Active created voice: ${label} — reusable as [${id}] in Scripted Dialogue & Chorus.`;
+      $("profileStatus").textContent = `${label}. Use it as [${id}] in dialogue and chorus.`;
       scheduleAutoSpeak();
     };
     $("pinnedCards").append(card);
@@ -3147,7 +3348,7 @@ async function main() {
     tagBtn.type = "button";
     tagBtn.className = "tag-pill";
     tagBtn.dataset.tag = `[${id}] `;
-    tagBtn.textContent = `★ [${id}]`;
+    tagBtn.textContent = id;
     tagBtn.onclick = () => {
       const ta = $("text");
       const start = ta.selectionStart ?? ta.value.length;
@@ -3160,9 +3361,9 @@ async function main() {
     };
     $("scriptToolbar").append(tagBtn);
 
-    SINGER_VOICE_OPTIONS.splice(1, 0, [id, `★ ${label} ([${id}])`]);
+    SINGER_VOICE_OPTIONS.splice(1, 0, [id, `${label} [${id}]`]);
     renderChorusTracks();
-    $("profileStatus").textContent = `Pinned ${label}! Click its card anytime, or use [${id}] in Scripted Dialogue and Chorus.`;
+    $("profileStatus").textContent = `Pinned as ${label}. Use it as [${id}] in dialogue and chorus.`;
   };
   $("resetVoiceBtn").onclick = () => {
     if (activeCardId && activeCardId.startsWith("profile:")) {
@@ -3209,7 +3410,7 @@ async function main() {
     const neutral = {};
     for (const v of TTS.vowelNames()) neutral[v] = [1, 1, 1];
     voice.configure({ vowels: neutral });
-    $("vowelReadout").textContent = "Speaker vowels reset to gender defaults.";
+    $("vowelReadout").textContent = "The vowels are back where this voice has them.";
     drawVowelSpace();
     scheduleAutoSpeak();
   };
@@ -3232,14 +3433,14 @@ async function main() {
       updateLivePhonetics();
       previewShortPhrase(w);
     } catch (err) {
-      $("customWordPreview").textContent = `Error: ${err.message}`;
+      $("customWordPreview").textContent = `Those phones were not understood: ${err.message}`;
     }
   };
 
   // Dictionary loader (tries local dev cache first, falls back to GitHub)
   $("dict").onclick = async () => {
     $("dict").disabled = true;
-    $("dictStatus").textContent = "Loading dictionary…";
+    $("dictStatus").textContent = "Loading the dictionary…";
     try {
       let text = null;
       if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
@@ -3254,11 +3455,11 @@ async function main() {
         text = await remoteRes.text();
       }
       const count = voice.loadDictionary(text);
-      $("dictStatus").textContent = `Loaded ${count.toLocaleString()} CMUdict pronunciations.`;
+      $("dictStatus").textContent = `${count.toLocaleString()} pronunciations loaded.`;
       updateLivePhonetics();
       updateCustomWordInspector();
     } catch (err) {
-      $("dictStatus").textContent = `Could not load dictionary (${err.message}).`;
+      $("dictStatus").textContent = `The dictionary could not be loaded (${err.message}).`;
       $("dict").disabled = false;
     }
   };
@@ -3290,7 +3491,7 @@ async function main() {
   $("copyProfileBtn").onclick = async () => {
     const { volume, variation, seed, ...profile } = voice.settings;
     await navigator.clipboard.writeText(JSON.stringify(profile, null, 2));
-    $("profileStatus").textContent = "Copied current voice profile JSON to clipboard.";
+    $("profileStatus").textContent = "This voice is on the clipboard as JSON.";
   };
 
   $("loadProfile").onclick = () => $("profileFile").click();
@@ -3301,7 +3502,7 @@ async function main() {
       applyProfileObject(JSON.parse(await file.text()), file.name, "");
       scheduleAutoSpeak();
     } catch (err) {
-      $("profileStatus").textContent = `Could not use ${file.name}: ${err.message}`;
+      $("profileStatus").textContent = `${file.name} could not be used: ${err.message}`;
     }
     e.target.value = "";
   };
@@ -3318,11 +3519,12 @@ async function main() {
   $("speak").disabled = false;
   $("retake").disabled = false;
   $("compareBtn").disabled = false;
-  $("status").textContent = "Ready · Click Speak or press Ctrl+Enter.";
+  $("modKey").textContent = IS_MAC ? "⌘" : "Ctrl";
+  $("status").textContent = readyText();
   document.documentElement.dataset.ready = "1";
 }
 
 main().catch((err) => {
-  $("status").textContent = `Failed to initialize WASM: ${err.message}`;
+  $("status").textContent = `The synthesizer could not start: ${err.message}`;
   console.error(err);
 });

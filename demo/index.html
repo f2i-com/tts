@@ -3,363 +3,401 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TTS · Vocal-Tract Speech Studio</title>
-<link rel="icon" href="data:,">
+<meta name="color-scheme" content="light dark">
+<title>TTS: a voice computed from the vocal tract</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230d1821'/%3E%3Cpath d='M3 21c3 0 4-11 8-11s3 11 6 11 4-11 8-11 3 11 6 11' fill='none' stroke='%23f0668a' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
 <div class="app-shell">
   <header class="topbar">
     <div class="brand">
-      <h1><span class="brand-dot"></span>TTS</h1>
-      <p class="tagline">Physical vocal-tract speech synthesizer in Rust + WebAssembly · No recordings · No AI · Zero network</p>
+      <h1 class="wordmark">
+        <svg class="mark" viewBox="0 0 44 20" aria-hidden="true"><path d="M1 17c4 0 5-14 10-14s4 14 8 14 5-14 10-14 4 14 8 14 3-5 6-5" /></svg>
+        TTS
+      </h1>
+      <p class="tagline"><span>Speech and singing computed from a physical model of the vocal tract.</span> <span>No recordings, no neural network, no server.</span></p>
     </div>
     <div class="topbar-right">
-      <span class="badge live" id="perfBadge">24 kHz · Pure Physics</span>
-      <span class="badge">Ctrl / ⌘ + Enter to speak</span>
-      <button id="themeBtn" class="sm" type="button" title="Switch light / dark studio theme">Theme: Auto</button>
+      <span class="perf" id="perfBadge" title="Output format and how fast the last utterance rendered">24 kHz mono</span>
+      <button id="themeBtn" class="quiet" type="button" title="Switch between automatic, light and dark">Theme: auto</button>
     </div>
   </header>
 
   <div class="studio-grid">
-    <!-- LEFT COLUMN: Script Composer + Acoustic & Articulatory Visualizer -->
-    <div class="col">
-      <section class="panel" aria-label="Script composer">
-        <div class="panel-head">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-            <h2 class="panel-title">Performance Studio</h2>
-            <div class="seg mode-seg" role="group" aria-label="Synthesis mode">
-              <button type="button" id="modeSpeechBtn" class="active" title="Standard natural text-to-speech">Speech</button>
-              <button type="button" id="modeScriptBtn" title="Multi-voice dialogue &amp; inline speed/pitch/style tags">Scripted Dialogue</button>
-              <button type="button" id="modeSingBtn" title="Musical note + lyric singing &amp; multi-voice chorus">Sing &amp; Chorus</button>
-            </div>
+    <!-- MAIN: composer, then the stage that shows what the voice is doing -->
+    <main class="surface col-main">
+      <section class="section composer" aria-label="Composer">
+        <div class="composer-top">
+          <div class="seg seg-lg mode-seg" role="group" aria-label="What to make">
+            <button type="button" id="modeSpeechBtn" class="active" title="Plain text to speech">Speech</button>
+            <button type="button" id="modeScriptBtn" title="Several voices, with inline speed, pitch and style tags">Dialogue</button>
+            <button type="button" id="modeSingBtn" title="Notes and lyrics, solo or in parts">Singing</button>
           </div>
-          <div class="seg" role="group" aria-label="Phonetic notation">
-            <button type="button" id="showIpaBtn" class="active">IPA</button>
-            <button type="button" id="showArpaBtn">ARPAbet</button>
+          <div class="samples">
+            <span class="samples-label">Try</span>
+            <div class="chips" id="promptChips"></div>
           </div>
         </div>
 
-        <div class="chips" id="promptChips"></div>
-
-        <!-- Inline Script Director Toolbar (shown in Scripted Dialogue mode) -->
+        <!-- Tag palette (Dialogue mode) -->
         <div id="scriptToolbar" class="director-bar" hidden>
-          <span class="dir-label">Insert tag:</span>
-          <button type="button" class="tag-pill" data-tag="[female] ">♀ Female</button>
-          <button type="button" class="tag-pill" data-tag="[male] ">♂ Male</button>
-          <button type="button" class="tag-pill" data-tag="[bright, cheerful] ">✦ Bright</button>
-          <button type="button" class="tag-pill" data-tag="[deep, calm] ">◈ Deep</button>
-          <button type="button" class="tag-pill" data-tag="[woman_a] ">Woman A</button>
-          <button type="button" class="tag-pill" data-tag="[excited, speed=1.16] ">⚡ Fast &amp; Excited</button>
-          <button type="button" class="tag-pill" data-tag="[slow, dramatic] ">⏳ Slow &amp; Dramatic</button>
-          <button type="button" class="tag-pill" data-tag="[pitch=+3st] ">↑ +3 st</button>
-          <button type="button" class="tag-pill" data-tag="[whisper, softer] ">🤫 Whisper</button>
-          <button type="button" class="tag-pill" data-tag="[pause=300ms] ">⏸ 300ms</button>
-          <button type="button" class="tag-pill" data-tag="[inhale] ">🌬 Inhale</button>
-          <button type="button" class="tag-pill" data-tag="[soprano, sing bpm=112] C5:1=La E5:1=la G5:2=la! [/sing] ">♪ Sing</button>
-          <button type="button" class="tag-pill" data-tag="[reset] ">↺ Reset</button>
+          <span class="dir-label">Voice</span>
+          <button type="button" class="tag-pill" data-tag="[female] ">female</button>
+          <button type="button" class="tag-pill" data-tag="[male] ">male</button>
+          <button type="button" class="tag-pill" data-tag="[bright, cheerful] ">bright</button>
+          <button type="button" class="tag-pill" data-tag="[deep, calm] ">deep</button>
+          <button type="button" class="tag-pill" data-tag="[woman_a] ">woman_a</button>
+          <span class="dir-label">Delivery</span>
+          <button type="button" class="tag-pill" data-tag="[excited, speed=1.16] ">excited</button>
+          <button type="button" class="tag-pill" data-tag="[slow, dramatic] ">slow</button>
+          <button type="button" class="tag-pill" data-tag="[pitch=+3st] ">pitch +3</button>
+          <button type="button" class="tag-pill" data-tag="[whisper, softer] ">whisper</button>
+          <button type="button" class="tag-pill" data-tag="[laughing] " title="Laughing while speaking: the laugh comes through the words, until [/laughing] or [reset]">laughing</button>
+          <button type="button" class="tag-pill" data-tag="[reset] ">reset</button>
+          <span class="dir-label">Timing</span>
+          <button type="button" class="tag-pill" data-tag="[pause=300ms] ">pause</button>
+          <button type="button" class="tag-pill" data-tag="[inhale] ">inhale</button>
+          <button type="button" class="tag-pill" data-tag="[soprano, sing bpm=112] C5:1=La E5:1=la G5:2=la! [/sing] ">sing</button>
         </div>
 
-        <!-- Speech & Scripted Dialogue Textarea -->
+        <!-- Laughs and the other sounds that are not words (Dialogue mode) -->
+        <div id="soundBar" class="sound-bar" hidden>
+          <div class="director-bar sound-row">
+            <span class="dir-label">Sounds</span>
+            <span id="soundQuick" class="sound-quick"></span>
+            <button type="button" id="soundMoreBtn" class="sm quiet sound-more" aria-expanded="false" aria-controls="soundPalette">All sounds</button>
+            <label class="check sound-hear" title="Play each sound in the current voice as it goes into the script"><input type="checkbox" id="soundHearCheck" checked><span>Hear on insert</span></label>
+          </div>
+          <div id="soundPalette" class="sound-palette" hidden></div>
+        </div>
+
+        <!-- Speech and Dialogue text -->
         <div id="textComposerWrap">
-          <textarea id="text" spellcheck="false">Hello! This voice is computed entirely in your browser from a physical model of the human vocal tract. Please pass a little water and butter — it can read numbers like 2026 or $5.99, ask rising questions, and switch between male and female speakers. Isn't that interesting?</textarea>
+          <textarea id="text" spellcheck="false" aria-label="Text to speak">Hello! This voice is computed entirely in your browser from a physical model of the human vocal tract. Please pass a little water and butter — it can read numbers like 2026 or $5.99, ask rising questions, and switch between male and female speakers. Isn't that interesting?</textarea>
         </div>
 
-        <!-- Musical Singing & Multi-Voice Chorus Composer (shown in Sing & Chorus mode) -->
+        <!-- Singing composer -->
         <div id="singComposerWrap" class="sing-composer" hidden>
           <div class="sing-top-controls">
-            <div class="seg" role="group" aria-label="Singing arrangement">
-              <button type="button" id="singViewSoloBtn" class="active" title="Sings using the exact voice configured on the right-hand panel">Solo (Your Voice)</button>
-              <button type="button" id="singViewChorusBtn" title="Multi-voice harmony choir (Lead defaults to your configured voice)">4-Part Chorus</button>
-              <button type="button" id="singViewRawBtn">Raw Score DSL</button>
+            <div class="seg" role="group" aria-label="Arrangement">
+              <button type="button" id="singViewSoloBtn" class="active" title="Sung by the voice set up in the Voice panel">Solo</button>
+              <button type="button" id="singViewChorusBtn" title="Several parts in harmony; the lead uses your voice">Chorus</button>
+              <button type="button" id="singViewRawBtn" title="Edit the score text directly">Score text</button>
             </div>
             <div class="sing-tempo-group">
-              <label class="seed-box" title="Tempo in beats per minute (quarter note = 1 beat)">
-                <span>BPM</span>
-                <input type="number" id="singBpmInput" value="104" min="40" max="240" step="2" style="width:54px">
+              <label class="num-field" title="Tempo in beats per minute (a quarter note is one beat)">
+                <span>Tempo</span>
+                <input type="number" id="singBpmInput" value="104" min="40" max="240" step="2">
               </label>
-              <label class="seed-box" title="Semitone transposition across all voices">
+              <label class="num-field" title="Shift every part by this many semitones">
                 <span>Key</span>
-                <input type="number" id="singTransposeInput" value="0" min="-12" max="12" step="1" style="width:46px">
+                <input type="number" id="singTransposeInput" value="0" min="-12" max="12" step="1">
                 <span>st</span>
               </label>
-              <select id="noteDurSelect" title="Duration in beats when clicking piano keys">
-                <option value="0.5">♪ 0.5 beat</option>
-                <option value="1" selected>♩ 1 beat</option>
-                <option value="1.5">♩. 1.5 beats</option>
-                <option value="2">𝅗𝅥 2 beats</option>
-                <option value="3">𝅗𝅥. 3 beats</option>
-                <option value="4">𝅝 4 beats</option>
+              <select id="noteDurSelect" title="Length of the note a piano key inserts" aria-label="Note length">
+                <option value="0.5">½ beat</option>
+                <option value="1" selected>1 beat</option>
+                <option value="1.5">1½ beats</option>
+                <option value="2">2 beats</option>
+                <option value="3">3 beats</option>
+                <option value="4">4 beats</option>
               </select>
             </div>
           </div>
 
-          <!-- Interactive Mini Piano Keyboard (click to audition & insert note into active voice part) -->
+          <!-- Piano: click a key to hear it and add it to the melody being edited -->
           <div class="piano-strip" id="pianoStrip" aria-label="Note keyboard"></div>
 
-          <!-- Multi-part Chorus Track Editor -->
+          <!-- Chorus parts -->
           <div id="chorusEditorPane" hidden>
             <div class="chorus-shared-lyrics">
-              <label for="chorusLyricsInput">Shared Lyrics <span style="color:var(--muted);font-weight:400">(auto-splits multi-syllable words, or use <code>~</code> to slur/hold a vowel across notes)</span></label>
+              <label for="chorusLyricsInput">Lyrics for every part <span class="field-note">words split into syllables on their own; <code>~</code> holds a vowel over the next note</span></label>
               <input type="text" id="chorusLyricsInput" spellcheck="false" value="Shine on bright star through the night sky guide our way home">
             </div>
             <div id="chorusTracksHost" class="chorus-tracks"></div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:8px;flex-wrap:wrap">
-              <button type="button" id="addChorusPartBtn" class="sm">+ Add Harmony Voice</button>
-              <span style="font-size:11.5px;color:var(--muted)">Lead uses your configured Studio Voice (`★ Your Voice`), or pick any singer per track.</span>
+            <div class="chorus-foot">
+              <button type="button" id="addChorusPartBtn" class="sm">Add a part</button>
+              <span class="field-note">The lead sings with the voice from the Voice panel; pick any singer for the others.</span>
             </div>
           </div>
 
-          <!-- Solo Notes + Lyrics Editor -->
+          <!-- Solo notes and lyrics -->
           <div id="soloEditorPane">
             <div class="solo-grid">
               <div>
-                <label class="field-lbl" for="soloNotesInput">Melody Notes (<code>Note:Beats</code>, <code>R:1</code> = rest · uses your configured voice)</label>
-                <textarea id="soloNotesInput" class="mono-area" rows="3" spellcheck="false">C4:1 C4:1 G4:1 G4:1 | A4:1 A4:1 G4:2 | F4:1 F4:1 E4:1 E4:1 | D4:1 D4:1 C4:2</textarea>
+                <label class="field-lbl" for="soloNotesInput">Melody <span class="field-note"><code>Note:beats</code>, <code>R:1</code> is a rest</span></label>
+                <textarea id="soloNotesInput" class="mono-area" rows="2" spellcheck="false">C4:1 C4:1 G4:1 G4:1 | A4:1 A4:1 G4:2 | F4:1 F4:1 E4:1 E4:1 | D4:1 D4:1 C4:2</textarea>
               </div>
               <div>
-                <label class="field-lbl" for="soloLyricsInput">Lyrics (words auto-syllabify, or hyphenate <code>Twin-kle</code>; <code>~</code> = melisma slur)</label>
-                <textarea id="soloLyricsInput" rows="3" spellcheck="false">Twinkle twinkle little star how I wonder what you are</textarea>
+                <label class="field-lbl" for="soloLyricsInput">Lyrics <span class="field-note">syllables split on their own, or write <code>Twin-kle</code>; <code>~</code> holds a vowel</span></label>
+                <textarea id="soloLyricsInput" rows="2" spellcheck="false">Twinkle twinkle little star how I wonder what you are</textarea>
               </div>
             </div>
           </div>
 
-          <!-- Raw Score DSL Editor -->
+          <!-- Score text -->
           <div id="rawScorePane" hidden>
-            <label class="field-lbl" for="rawScoreInput">Score DSL (<code>[part name="Soprano" voice=soprano] Note:Beats=Lyric</code>)</label>
+            <label class="field-lbl" for="rawScoreInput">Score <span class="field-note"><code>[part name="Soprano" voice=soprano] Note:beats=lyric</code></span></label>
             <textarea id="rawScoreInput" class="mono-area" rows="6" spellcheck="false"></textarea>
           </div>
         </div>
 
         <div class="transport">
-          <button id="speak" class="primary" disabled>▶ Speak</button>
-          <button id="stop" disabled>■ Stop</button>
-          <button id="retake" disabled title="Re-roll seeded human tempo, pause, and pitch variation">↻ New take</button>
-          <button id="compareBtn" disabled title="Hear the current script with LF Equation Pulse vs. Simulated Vocal Folds">⇄ Compare Fold Physics</button>
-          <button id="download" disabled title="Save 24 kHz 16-bit mono WAV">↓ WAV</button>
-
-          <div class="seed-box" title="Deterministic take seed (same text + voice + seed = identical audio)">
-            <span>Seed</span>
-            <input type="number" id="seedInput" value="0" min="0" max="999999999" step="1">
+          <div class="transport-main">
+            <button id="speak" class="primary speak-btn" disabled><span class="ico ico-play" aria-hidden="true"></span><span id="speakLabel">Speak</span></button>
+            <button id="stop" class="stop-btn" disabled><span class="ico ico-stop" aria-hidden="true"></span>Stop</button>
+            <span class="kbd-hint" title="Keyboard shortcut while typing"><kbd id="modKey">Ctrl</kbd><kbd>Enter</kbd></span>
           </div>
-
+          <div class="transport-more">
+            <button id="retake" disabled title="Speak it again with different timing, pauses and pitch wander">New take</button>
+            <label class="num-field" title="The same text, voice and seed always give the same audio">
+              <span>Seed</span>
+              <input type="number" id="seedInput" value="0" min="0" max="999999999" step="1">
+            </label>
+            <button id="download" disabled title="Save as a 24 kHz 16-bit mono WAV file">Download WAV</button>
+          </div>
           <div class="transport-checks">
-            <label class="check" title="Repeat utterance continuously"><input type="checkbox" id="loopCheck"> Loop</label>
-            <label class="check" title="Automatically speak shortly after tweaking voice controls"><input type="checkbox" id="autoSpeakCheck"> Auto-preview</label>
+            <label class="check" title="Repeat until stopped"><input type="checkbox" id="loopCheck"><span>Loop</span></label>
           </div>
         </div>
 
         <div class="status-bar">
-          <span id="status">Loading WebAssembly synthesizer…</span>
+          <span id="status" role="status">Loading the synthesizer…</span>
           <span id="normPreview"></span>
         </div>
       </section>
 
-      <section class="panel" aria-label="Acoustic and articulatory monitor">
-        <div class="panel-head">
-          <h2 class="panel-title">Articulatory &amp; Acoustic Monitor</h2>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <span id="timeReadout" style="font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums">0.00s / 0.00s</span>
-            <div class="seg" role="group" aria-label="Avatar and vocal tract view">
-              <button type="button" id="animSplitBtn" class="active" title="Side-by-side Expressive Speaker + X-Ray Vocal Tract">Split</button>
-              <button type="button" id="animFaceBtn" title="Expressive Speaking Avatar">Face</button>
-              <button type="button" id="animTractBtn" title="Anatomical Midsagittal X-Ray Vocal Tract">X-Ray</button>
-            </div>
+      <section class="section stage" aria-label="Vocal tract and acoustics">
+        <div class="stage-head">
+          <div class="seg" role="group" aria-label="Stage view">
+            <button type="button" id="animSplitBtn" class="active" title="Speaker and vocal tract side by side">Both</button>
+            <button type="button" id="animFaceBtn" title="The speaker's face">Face</button>
+            <button type="button" id="animTractBtn" title="Side view through the vocal tract">X-ray</button>
+          </div>
+          <div class="readouts">
+            <span class="ro ro-word" id="activeWordBadge" title="Word being spoken"></span>
+            <span class="ro ro-phone" id="activePhoneBadge" title="Sound being made"></span>
+            <span class="ro ro-f0" id="activeF0Badge" title="Pitch of the voice"></span>
+            <span class="ro ro-time" id="timeReadout" title="Position and length">0.00 / 0.00 s</span>
           </div>
         </div>
 
-        <div class="viz-stack">
-          <div class="canvas-card stage-card" title="Real-time 200 fps articulatory physics &amp; lip-sync visualizer">
-            <canvas id="tractCanvas" width="760" height="260"></canvas>
-            <div class="canvas-overlay">
-              <div class="live-pills">
-                <span class="stage-pill" id="stageModeLabel">Expressive Avatar + Midsagittal X-Ray</span>
-                <span class="stage-pill speaker-pill" id="activeSpeakerBadge" hidden></span>
-                <span class="stage-pill word-pill" id="activeWordBadge" hidden></span>
-                <span class="stage-pill phone-pill" id="activePhoneBadge" hidden></span>
-                <span class="stage-pill f0-pill" id="activeF0Badge" hidden></span>
-              </div>
-            </div>
-            <div class="tract-meters">
-              <div class="meter-item"><div class="meter-track"><div class="meter-fill" id="mJaw"></div></div><span>Jaw</span></div>
-              <div class="meter-item"><div class="meter-track"><div class="meter-fill" id="mTongue" style="background:#f472b6"></div></div><span>Tongue</span></div>
-              <div class="meter-item"><div class="meter-track"><div class="meter-fill" id="mLips" style="background:#fb7185"></div></div><span>Lips</span></div>
-              <div class="meter-item"><div class="meter-track"><div class="meter-fill" id="mVelum" style="background:#f59e0b"></div></div><span>Velum</span></div>
-              <div class="meter-item"><div class="meter-track"><div class="meter-fill" id="mEnergy" style="background:#2dd4bf"></div></div><span>Voice</span></div>
-              <div class="meter-item"><div class="meter-track"><div class="meter-fill" id="mAir" style="background:#38bdf8"></div></div><span>Airflow</span></div>
-            </div>
+        <div class="plate stage-plate">
+          <canvas id="tractCanvas" width="760" height="280"></canvas>
+          <span class="plate-id" id="activeSpeakerBadge" hidden></span>
+          <span class="sr-only" id="stageModeLabel">Speaker and vocal tract side by side</span>
+          <div class="tract-meters">
+            <div class="meter-item"><span>Jaw</span><div class="meter-track"><div class="meter-fill m-rose" id="mJaw"></div></div></div>
+            <div class="meter-item"><span>Tongue</span><div class="meter-track"><div class="meter-fill m-rose" id="mTongue"></div></div></div>
+            <div class="meter-item"><span>Lips</span><div class="meter-track"><div class="meter-fill m-rose" id="mLips"></div></div></div>
+            <div class="meter-item"><span>Velum</span><div class="meter-track"><div class="meter-fill m-rose" id="mVelum"></div></div></div>
+            <div class="meter-item"><span>Voice</span><div class="meter-track"><div class="meter-fill m-gold" id="mEnergy"></div></div></div>
+            <div class="meter-item"><span>Air</span><div class="meter-track"><div class="meter-fill m-ice" id="mAir"></div></div></div>
           </div>
+        </div>
 
-          <div class="canvas-card" title="Click or drag anywhere on the plot to scrub and play from that moment">
-            <canvas id="waveCanvas" width="760" height="190"></canvas>
-            <div class="canvas-overlay">
-              <span id="vizModeLabel">0–8 kHz Spectrogram · Cyan = F0 · Dotted = F1–F3</span>
-              <div class="overlay-controls">
-                <button type="button" id="toggleFormantsBtn" class="mini-pill active" title="Overlay F1, F2, F3 vocal-tract formant tracks">F1–F3</button>
-                <button type="button" id="viewSpecBtn" class="mini-pill active">Spectrogram</button>
-                <button type="button" id="viewWaveBtn" class="mini-pill">Waveform</button>
-              </div>
+        <div class="plate spec-plate">
+          <canvas id="waveCanvas" width="760" height="190" title="Drag to scrub; release to play from there"></canvas>
+          <div class="plate-bar">
+            <div class="legend">
+              <span id="vizModeLabel">Spectrogram, 0 to 8 kHz</span>
+              <span class="lg lg-f0">pitch</span>
+              <span class="lg lg-fm" id="legendFormants">formants</span>
+              <span class="lg-hint">drag to scrub</span>
+            </div>
+            <div class="overlay-controls">
+              <button type="button" id="toggleFormantsBtn" class="mini-pill active" title="Show the first three vocal-tract resonances over the spectrogram">Formants</button>
+              <button type="button" id="viewSpecBtn" class="mini-pill active">Spectrogram</button>
+              <button type="button" id="viewWaveBtn" class="mini-pill">Waveform</button>
             </div>
           </div>
         </div>
 
         <div class="transcript-box">
-          <div id="words"><span style="color:var(--muted);font-size:13.5px">Click <b>Speak</b> to see word-level timing and click any word to jump to it.</span></div>
+          <div id="words"><span class="placeholder">Press Speak, then click any word to play from it.</span></div>
           <div class="phoneme-row">
             <p id="ipa"></p>
+            <div class="seg seg-sm" role="group" aria-label="Phonetic notation">
+              <button type="button" id="showIpaBtn" class="active">IPA</button>
+              <button type="button" id="showArpaBtn">ARPAbet</button>
+            </div>
           </div>
         </div>
       </section>
-    </div>
+    </main>
 
-    <!-- RIGHT COLUMN: Voice Presets, Excitation Source & Tabbed Studio Controls -->
-    <div class="col">
-      <section class="panel" aria-label="Voice selection">
-        <div class="panel-head">
-          <h2 class="panel-title">Voices &amp; Excitation Source</h2>
-          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-            <div class="seg" role="group" aria-label="Base gender">
+    <!-- SIDE: who is speaking, and every control of that voice -->
+    <aside class="surface col-side">
+      <section class="section voice" aria-label="Voice">
+        <div class="section-head">
+          <h2>Voice</h2>
+          <div class="head-actions">
+            <div class="seg seg-sm" role="group" aria-label="Base voice">
               <button type="button" id="male" aria-pressed="true">Male</button>
               <button type="button" id="female" aria-pressed="false">Female</button>
             </div>
-            <button type="button" id="randomVoiceBtn" class="sm primary" title="Generate a brand-new random human voice (Shift+Click keeps current gender)">🎲 Random</button>
-            <button type="button" id="pinVoiceBtn" class="sm" title="Save current voice as a reusable [voice_N] character for Dialogue &amp; Singing">+ Pin Voice</button>
-            <button type="button" id="resetVoiceBtn" class="sm" title="Reset current voice to its clean preset defaults">Reset</button>
+            <button type="button" id="resetVoiceBtn" class="sm quiet" title="Put every control back to this voice's own values">Reset</button>
           </div>
         </div>
 
-        <!-- Hidden select synced for API/preset compatibility -->
-        <select id="preset" class="sr-only" aria-label="Preset"></select>
+        <!-- Kept in sync for anything that wants a plain select -->
+        <select id="preset" class="sr-only" aria-label="Preset" tabindex="-1"></select>
 
         <div id="pinnedVoicesWrap" hidden>
-          <div class="voice-group-label">Created Voices (Click to select · use <code>[voice_1]</code> in Dialogue &amp; Chorus)</div>
+          <div class="voice-group-label">Pinned <span class="field-note">use as <code>[voice_1]</code> in dialogue and chorus</span></div>
           <div class="voice-cards" id="pinnedCards"></div>
         </div>
 
-        <div class="voice-group-label">Built-in Voices</div>
+        <div class="voice-group-label">Built in</div>
         <div class="voice-cards" id="builtinCards"></div>
 
-        <div class="voice-group-label">Copied from Real Speakers (settings fitted to CMU Arctic)</div>
+        <div class="voice-group-label">Fitted to real speakers <span class="field-note">settings only, no audio</span></div>
         <div class="voice-cards profiles-grid" id="profileCards"></div>
 
-        <div class="source-strip">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <span style="font-size:12.5px;font-weight:600">Glottal Source:</span>
-            <div class="seg" role="group" aria-label="Glottal source model">
-              <button type="button" id="srcEquationBtn" class="active">LF Equation Pulse</button>
-              <button type="button" id="srcFoldsBtn">Simulated Vocal Folds</button>
-            </div>
-          </div>
-          <label class="check"><input type="checkbox" id="whisper"> Whisper</label>
-          <input type="checkbox" id="folds" hidden>
+        <div class="voice-make">
+          <button type="button" id="randomVoiceBtn" title="Invent a new voice (hold Shift to keep the current gender)">Random voice</button>
+          <button type="button" id="pinVoiceBtn" title="Keep this voice as [voice_N] for dialogue and singing">Pin this voice</button>
         </div>
-        <p class="source-note" id="profileStatus">LF Equation Pulse (~500× real-time) computes band-limited glottal flow derivatives; Simulated Vocal Folds (~100× real-time) integrates a physical 2-mass spring-aerodynamic larynx.</p>
+
+        <div class="source-strip">
+          <span class="source-label">Glottal source</span>
+          <div class="seg seg-sm" role="group" aria-label="Glottal source model">
+            <button type="button" id="srcEquationBtn" class="active" title="Each puff of air read from the Liljencrants-Fant equation (fastest)">Equation pulse</button>
+            <button type="button" id="srcFoldsBtn" title="Two masses per fold, blown apart by lung pressure (slower)">Simulated folds</button>
+          </div>
+          <input type="checkbox" id="folds" hidden>
+          <button type="button" id="compareBtn" class="sm" disabled title="Hear the composer's text with the equation pulse, then with the simulated folds">Compare the two</button>
+          <label class="check" title="Breath only, no vibration of the folds"><input type="checkbox" id="whisper"><span>Whisper</span></label>
+        </div>
+        <p class="source-note" id="profileStatus">The equation pulse reads each puff of air from a formula. Simulated folds integrate a two-mass model of the larynx, a few times slower.</p>
       </section>
 
-      <section class="panel" aria-label="Voice studio parameters">
+      <section class="section settings" aria-label="Voice controls">
+        <div class="section-head">
+          <h2>Controls</h2>
+          <label class="check" title="Speak again shortly after any control changes"><input type="checkbox" id="autoSpeakCheck"><span>Hear each change</span></label>
+        </div>
         <div class="tabs" role="tablist">
-          <button type="button" class="tab-btn active" data-tab="tabEssentials" role="tab">Essentials</button>
-          <button type="button" class="tab-btn" data-tab="tabPhysics" role="tab">Larynx &amp; Formants</button>
-          <button type="button" class="tab-btn" data-tab="tabToneVowels" role="tab">Tone EQ &amp; Vowels</button>
-          <button type="button" class="tab-btn" data-tab="tabDict" role="tab">Dictionary &amp; JSON</button>
-          <button type="button" class="tab-btn" data-tab="tabApi" role="tab">WASM &amp; AI API</button>
+          <button type="button" class="tab-btn active" data-tab="tabEssentials" role="tab" aria-selected="true">Essentials</button>
+          <button type="button" class="tab-btn" data-tab="tabPhysics" role="tab">Larynx</button>
+          <button type="button" class="tab-btn" data-tab="tabToneVowels" role="tab">Tone &amp; vowels</button>
+          <button type="button" class="tab-btn" data-tab="tabDict" role="tab">Dictionary</button>
+          <button type="button" class="tab-btn" data-tab="tabApi" role="tab">API</button>
         </div>
 
-        <!-- TAB 1: Essentials -->
+        <!-- Essentials -->
         <div class="tab-pane active" id="tabEssentials">
           <div class="slider-grid" id="slidersEssentials"></div>
-          <p class="hint-line">Tip: Double-click any slider to restore that control's default value.</p>
+          <p class="hint-line">Double-click a slider to put it back. The tick under each track marks this voice's own value.</p>
         </div>
 
-        <!-- TAB 2: Larynx & Formants -->
+        <!-- Larynx and formants -->
         <div class="tab-pane" id="tabPhysics">
           <div class="slider-grid" id="slidersPhysics"></div>
-          <p class="hint-line">Controls the glottal closure edge, open quotient, subglottal trachea loading, and global F1–F5 resonances.</p>
+          <p class="hint-line">How the folds close and how long they stay open, the airway below them, and the resonances F1 to F5 of the whole tract.</p>
         </div>
 
-        <!-- TAB 3: 10-Band Tone EQ & 2D Vowel Space -->
+        <!-- Tone curve and vowel space -->
         <div class="tab-pane" id="tabToneVowels">
-          <div class="eq-box">
-            <div class="panel-head" style="margin-bottom:6px">
-              <span class="panel-title">10-Band Voiced Tone Curve (-18 to +18 dB)</span>
-              <button type="button" id="flatEqBtn" class="sm">Flat (0 dB)</button>
-            </div>
-            <div class="slider-grid" id="slidersToneMacro" style="margin-bottom:10px"></div>
-            <div class="eq-bars" id="eqBars"></div>
+          <div class="sub-head">
+            <h3>Tone curve</h3>
+            <button type="button" id="flatEqBtn" class="sm quiet">Flatten</button>
           </div>
+          <div class="slider-grid" id="slidersToneMacro"></div>
+          <div class="eq-bars" id="eqBars"></div>
 
-          <div class="vowel-studio">
-            <div class="panel-head" style="margin-bottom:6px">
-              <span class="panel-title">Speaker Vowel Space (Drag any vowel · Click to audition)</span>
-              <button type="button" id="resetVowelsBtn" class="sm">Reset Vowels</button>
-            </div>
-            <canvas id="vowelCanvas" width="460" height="220"></canvas>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:11.5px;color:var(--muted)">
-              <span id="vowelReadout">Select or drag a vowel dot (x = F2 front/back, y = F1 close/open).</span>
-              <span>×0.70 – ×1.35</span>
-            </div>
+          <div class="sub-head sub-head-gap">
+            <h3>Vowel space</h3>
+            <button type="button" id="resetVowelsBtn" class="sm quiet">Reset vowels</button>
           </div>
+          <div class="plate vowel-plate">
+            <canvas id="vowelCanvas" width="460" height="240"></canvas>
+          </div>
+          <p class="hint-line" id="vowelReadout">Drag a vowel to move it; let go to hear it.</p>
         </div>
 
-        <!-- TAB 4: Pronunciation Trainer, CMUdict & Voice Profile JSON -->
+        <!-- Pronunciation, dictionary, voice file -->
         <div class="tab-pane" id="tabDict">
           <div class="subcard">
-            <h3>Custom Word Pronunciation Trainer</h3>
-            <p>Inspect how any word is pronounced or teach custom ARPAbet stress &amp; phones (<code>1</code> = primary stress, <code>2</code> = secondary, <code>0</code> = unstressed).</p>
+            <h3>Teach a word</h3>
+            <p>See how a word is pronounced, or correct it in ARPAbet. A digit after a vowel sets its stress: <code>1</code> main, <code>2</code> secondary, <code>0</code> none.</p>
             <div class="form-row">
-              <input type="text" id="customWordInput" placeholder="Word (e.g. antigravity)" value="antigravity" style="width:155px">
-              <input type="text" id="customPhonesInput" class="mono-input" placeholder="ARPAbet phones">
-              <button type="button" id="sayWordBtn" class="sm">▶ Test</button>
-              <button type="button" id="addWordBtn" class="sm primary">Teach Word</button>
+              <input type="text" id="customWordInput" placeholder="Word" value="quinoa" aria-label="Word">
+              <input type="text" id="customPhonesInput" class="mono-input" placeholder="ARPAbet phones" aria-label="ARPAbet phones">
             </div>
-            <div id="customWordPreview" style="font-size:12px;color:var(--muted);margin-top:6px;font-family:ui-monospace,monospace"></div>
+            <div class="chips word-examples" id="wordExamples">
+              <span class="samples-label">Words it gets wrong</span>
+              <button type="button" class="chip" data-word="quinoa" data-phones="K IY1 N W AA0">quinoa</button>
+              <button type="button" class="chip" data-word="gnocchi" data-phones="N Y OW1 K IY0">gnocchi</button>
+              <button type="button" class="chip" data-word="segue" data-phones="S EH1 G W EY0">segue</button>
+              <button type="button" class="chip" data-word="Siobhan" data-phones="SH IH0 V AO1 N">Siobhan</button>
+              <button type="button" class="chip" data-word="Hermione" data-phones="HH ER0 M AY1 AX0 N IY0">Hermione</button>
+            </div>
+            <div class="form-row">
+              <button type="button" id="sayWordBtn" class="sm">Hear it</button>
+              <button type="button" id="addWordBtn" class="sm solid">Teach word</button>
+            </div>
+            <div id="customWordPreview" class="word-preview"></div>
             <div class="custom-words-list" id="customWordsList"></div>
           </div>
 
           <div class="subcard">
-            <h3>Full CMU Pronouncing Dictionary</h3>
-            <p>~50,000 common English words are already accurate out of the box. Load the full 134,000-word CMU dictionary for rare names and technical jargon.</p>
+            <h3>Full pronouncing dictionary</h3>
+            <p>About 50,000 common words are covered out of the box. Loading the 134,000-word CMU dictionary adds rare names and jargon; it is fetched from GitHub.</p>
             <div class="form-row">
-              <button type="button" id="dict">Load full CMUdict (134k words)</button>
-              <span id="dictStatus" style="font-size:12.5px;color:var(--muted)">Built-in compact lexicon + G2P rules active.</span>
+              <button type="button" id="dict" class="sm">Load CMUdict</button>
+              <span id="dictStatus" class="field-note">Using the built-in lexicon and letter-to-sound rules.</span>
             </div>
           </div>
 
           <div class="subcard">
-            <h3>Voice Profile JSON</h3>
-            <p>Every voice is pure settings — export, share, or load profiles fitted by <code>tools/fit_voice.py</code>.</p>
+            <h3>Voice file</h3>
+            <p>A voice is only its settings. Save it as JSON, share it, or load one fitted to a speaker with <code>tools/fit_voice.py</code>.</p>
             <div class="form-row">
-              <button type="button" id="saveProfile">↓ Save JSON</button>
-              <button type="button" id="loadProfile">↑ Load JSON…</button>
-              <button type="button" id="copyProfileBtn">Copy JSON</button>
+              <button type="button" id="saveProfile" class="sm">Save JSON</button>
+              <button type="button" id="loadProfile" class="sm">Load JSON…</button>
+              <button type="button" id="copyProfileBtn" class="sm">Copy JSON</button>
               <input type="file" id="profileFile" accept=".json,application/json" hidden>
             </div>
           </div>
         </div>
 
-        <!-- TAB 5: Easy WASM & AI Agent Integration -->
+        <!-- Using it from code -->
         <div class="tab-pane" id="tabApi">
-          <div class="subcard">
-            <div class="panel-head" style="margin-bottom:6px">
-              <h3 style="margin:0">Self-Contained <code>tts.wasm</code> API (Internal JS Glue · Zero Models)</h3>
-              <button type="button" id="copyApiSnippetBtn" class="sm primary">Copy Live Snippet</button>
-            </div>
-            <p>Embed the single standalone <code>tts.wasm</code> (its JS <code>TTS</code> glue is baked inside the WASM!) or import <code>./tts.js</code> to generate voices, steer emotions, speak dialogues, or sing choirs:</p>
-            <pre class="code-box" id="apiSnippetBox"></pre>
+          <div class="sub-head">
+            <h3>Use it from code</h3>
+            <button type="button" id="copyApiSnippetBtn" class="sm solid">Copy snippet</button>
           </div>
-          <div class="subcard">
-            <h3>Inline Script, Voice Randomizer &amp; Singing Cheat-Sheet</h3>
-            <p style="margin-bottom:6px">
-              <b>Create &amp; Reuse Voices:</b> <code>const v = new TTS();</code> · <code>const hero = v.randomize({ name: "hero", gender: "female" });</code> → reuse as <code>[hero]</code>!<br>
-              <b>Built-in Voices:</b> <code>[male]</code> <code>[female]</code> <code>[bright]</code> <code>[deep]</code> <code>[husky]</code> <code>[whisper]</code> <code>[woman_a]</code> <code>[woman_b]</code> <code>[man_a]</code> <code>[man_b]</code> <code>[soprano]</code> <code>[alto]</code> <code>[tenor]</code><br>
-              <b>Styles &amp; Controls:</b> <code>[excited]</code> <code>[calm]</code> <code>[happy]</code> <code>[sad]</code> <code>[speed=1.2]</code> <code>[pitch=+3st]</code> <code>[pause=300ms]</code> <code>[inhale]</code> <code>[reset]</code><br>
-              <b>Singing:</b> <code>C4:1=Twin- G4:2=star</code> · <code>~</code> = melisma slur · <code>R:1</code> = rest · <code>v.sing(notes, lyrics, bpm)</code> · <code>v.singChorus({ bpm, parts })</code>
-            </p>
+          <p class="pane-note"><code>tts.wasm</code> has no imports and carries its own JavaScript wrapper, so one file is the whole engine. The snippet follows what is in the composer.</p>
+          <pre class="code-box" id="apiSnippetBox"></pre>
+
+          <div class="sub-head sub-head-gap">
+            <h3>Script and score reference</h3>
           </div>
+          <dl class="cheats">
+            <dt>Voices</dt>
+            <dd><code>[male]</code> <code>[female]</code> <code>[bright]</code> <code>[deep]</code> <code>[husky]</code> <code>[whisper]</code> <code>[woman_a]</code> <code>[woman_b]</code> <code>[man_a]</code> <code>[man_b]</code> <code>[soprano]</code> <code>[alto]</code> <code>[tenor]</code></dd>
+            <dt>Your own</dt>
+            <dd><code>v.randomize({ name: "hero", gender: "female" })</code> then <code>[hero]</code></dd>
+            <dt>Delivery</dt>
+            <dd><code>[excited]</code> <code>[calm]</code> <code>[happy]</code> <code>[sad]</code> <code>[speed=1.2]</code> <code>[pitch=+3st]</code> <code>[reset]</code>; laughing while speaking: <code>[laughing]</code> … <code>[/laughing]</code>, <code>[laughter=0.8]</code>, or the <code>laughter</code> setting</dd>
+            <dt>Timing</dt>
+            <dd><code>[pause=300ms]</code> <code>[inhale]</code></dd>
+            <dt>Sounds</dt>
+            <dd><code>[laugh]</code> <code>[giggle]</code> <code>[chuckle]</code> <code>[sigh]</code> <code>[gasp]</code> <code>[cough]</code> <code>[hmm]</code> <code>[uh-huh]</code> <code>[shh]</code> <code>[whistle]</code> and the rest of <code>TTS.sounds()</code>; stronger or longer with <code>[laugh=strong]</code>, <code>[sigh length=1.5]</code>, for a set time with <code>[laugh=3s]</code>; from code, <code>v.sound("laugh", { durationMs: 3000 })</code></dd>
+            <dt>Singing</dt>
+            <dd><code>C4:1=Twin-</code> <code>G4:2=star</code> <code>R:1</code> rest, <code>~</code> hold; <code>v.sing(notes, lyrics, bpm)</code>, <code>v.singChorus({ bpm, parts })</code></dd>
+          </dl>
         </div>
       </section>
-    </div>
+    </aside>
   </div>
+
+  <footer class="site-foot">
+    <p>Created by <a href="https://f2i.com" target="_blank" rel="noopener">f2i.com</a>. Open source under the <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener">Apache License 2.0</a>.</p>
+    <p><a class="repo" href="https://github.com/f2i-com/tts" target="_blank" rel="noopener">github.com/f2i-com/tts</a></p>
+  </footer>
 </div>
 
 <script type="module" src="./app.js"></script>
