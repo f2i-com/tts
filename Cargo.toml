@@ -2,6 +2,7 @@
 name = "tts"
 version = "1.0.0"
 edition = "2021"
+license = "Apache-2.0"
 homepage = "https://tts.computer"
 repository = "https://github.com/f2i-com/tts"
 description = "TTS (tts.computer): physical human vocal-tract speech & singing synthesizer in Rust and self-contained WebAssembly. Zero models, zero samples, zero dependencies."
