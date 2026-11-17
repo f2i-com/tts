@@ -4,7 +4,7 @@
 
 use crate::config::VoiceConfig;
 use crate::phone::Ph;
-use crate::plan::Plan;
+use crate::plan::{Plan, Weight};
 use crate::tables::{self, Place, Spec};
 use crate::durations;
 use crate::tune;
@@ -124,7 +124,8 @@ struct Flat {
     word: i32,
     is_nuclear_word: bool,
     is_content: bool,
-    is_aux: bool,
+    /// The word is said in full but carries no accent of its own (see `plan::Weight::Light`).
+    is_light: bool,
     is_word_initial: bool,
     is_word_final: bool,
     is_clause_final_word: bool,
@@ -314,6 +315,21 @@ fn is_approximant(p: Ph) -> bool {
     matches!(p, Ph::L | Ph::R | Ph::W | Ph::Y)
 }
 
+/// The frequency above which the noise of a stop's release is cut off (0 = not at all),
+/// from where the stop is made and the frequency of its burst. The burst of /k g/ is one
+/// compact band: before "w" or "r" a real one has next to nothing above 2 kHz, and with a
+/// skirt reaching to the top of the band, as a single resonator leaves it, it was heard as
+/// /t d/ - a quarter of the misheard /k g/ went with it. /t d/ and the affricates hiss all
+/// the way up.
+pub(crate) fn burst_ceiling(place: Place, burst_hz: f64) -> f64 {
+    match place {
+        Place::Velar => clamp(tune("velar_lp", 1.7) * burst_hz, 0.0, 6500.0),
+        // (a ceiling on /p b/ was tried too: without their click they were heard as /w/)
+        Place::Labial => tune("labial_lp", 0.0),
+        Place::Alveolar | Place::Other => 0.0,
+    }
+}
+
 pub fn build_timeline(plan: &Plan, cfg: &VoiceConfig) -> Timeline {
     let speed = clamp(cfg.speed, 0.55, 1.75);
     let rate_scale = 1.0 / speed;
@@ -322,8 +338,10 @@ pub fn build_timeline(plan: &Plan, cfg: &VoiceConfig) -> Timeline {
     let whisper = cfg.whisper;
     // (The reference voices speak 5.4-5.7 syllables a second; at 1.0 the synthesizer spoke
     // 4.4. Going all the way costs clarity; 8% costs the female voice nothing, and the male
-    // voice, whose consonants are less robust, keeps to 4%.)
-    let dur_scale = tune("dur_scale", if cfg.gender == crate::config::Gender::Female { 0.92 } else { 0.96 });
+    // voice, whose consonants are less robust, keeps to 4%. A further 2-3% keeps the pace
+    // where it was now that the duration model no longer counts pronouns and auxiliaries
+    // among the content words, which made the rest come out longer.)
+    let dur_scale = tune("dur_scale", if cfg.gender == crate::config::Gender::Female { 0.90 } else { 0.93 });
     // The corpus speakers read briskly; the default voice is a little more deliberate.
     let vowel_scale = tune("vdur", 1.35);
     let cons_scale = tune("cdur", 1.05);
@@ -351,11 +369,13 @@ pub fn build_timeline(plan: &Plan, cfg: &VoiceConfig) -> Timeline {
         let ci_i = ci as i32;
         let mut flat: Vec<Flat> = Vec::new();
 
-        // The nuclear (most prominent) accent falls on the last content word.
+        // The nuclear (most prominent) accent falls on the last word that carries meaning
+        // ("I *saw* him", not "I saw *him*"); a phrase of little words only ("It is.") has it
+        // on its last word.
         let nuclear_word_idx = clause
             .words
             .iter()
-            .rposition(|w| w.is_content)
+            .rposition(|w| w.weight == Weight::Content)
             .or(if clause.words.is_empty() {
                 None
             } else {
@@ -363,30 +383,25 @@ pub fn build_timeline(plan: &Plan, cfg: &VoiceConfig) -> Timeline {
             });
 
         // No two phrases are spoken at exactly the same pace.
-        let clause_tempo = (0.06 * variation * rng.gauss()).exp();
+        let clause_tempo = (tune("var_clause", 0.06) * variation * rng.gauss()).exp();
 
         for (wi, w_obj) in clause.words.iter().enumerate() {
             let n_sylls = w_obj.phones.iter().filter(|p| p.ph.is_vowel()).count().max(1);
             // Tempo drifts from word to word: each word inherits part of the previous word's
             // pace and adds its own deviation.
             tempo_walk = 0.55 * tempo_walk + 0.835 * rng.gauss();
-            let word_tempo = clause_tempo * (0.11 * variation * tempo_walk).exp();
-            // ... and so does loudness, by a decibel or so.
-            let word_effort = (0.23 * variation * rng.gauss()).exp();
+            let word_tempo = clause_tempo * (tune("var_word", 0.11) * variation * tempo_walk).exp();
+            // ... and so does loudness, a little. (It was a decibel or so: of the kinds of
+            // unevenness that was the one that cost naturalness instead of adding it -
+            // a real voice is louder where the sentence wants it, not at random.)
+            let word_effort = (tune("var_effort", 0.06) * variation * rng.gauss()).exp();
             let n_ph = w_obj.phones.len();
-            let is_aux = !w_obj.is_clause_final
-                && Some(wi) != nuclear_word_idx
-                && matches!(
-                    w_obj.text.as_str(),
-                    "have" | "has" | "had" | "been" | "being" | "do" | "does" | "did"
-                        | "will" | "would" | "could" | "should" | "shall" | "may" | "might" | "must"
-                );
             for (pi, p) in w_obj.phones.iter().enumerate() {
                 let next_vowel = w_obj.phones[pi + 1..].iter().find(|q| q.ph.is_vowel());
                 flat.push(Flat {
                     base: p.ph,
                     stress: p.stress,
-                    tempo: word_tempo * (0.05 * variation * rng.gauss()).exp(),
+                    tempo: word_tempo * (tune("var_phone", 0.05) * variation * rng.gauss()).exp(),
                     effort: word_effort,
                     n_sylls,
                     last_syllable: next_vowel.is_none(),
@@ -394,7 +409,7 @@ pub fn build_timeline(plan: &Plan, cfg: &VoiceConfig) -> Timeline {
                     word: word_base + wi as i32,
                     is_nuclear_word: Some(wi) == nuclear_word_idx,
                     is_content: w_obj.is_content,
-                    is_aux,
+                    is_light: w_obj.weight == Weight::Light && Some(wi) != nuclear_word_idx,
                     is_word_initial: pi == 0,
                     is_word_final: pi == n_ph - 1,
                     is_clause_final_word: w_obj.is_clause_final,
@@ -424,7 +439,7 @@ pub fn build_timeline(plan: &Plan, cfg: &VoiceConfig) -> Timeline {
             if dump_features {
                 let name = |k: Option<&Flat>| k.map_or("SIL", |f| f.base.name());
                 feature_lines.push(format!(
-                    "{token} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
+                    "{token} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
                     item.base.name(),
                     item.stress,
                     item.is_content as u8,
@@ -441,6 +456,7 @@ pub fn build_timeline(plan: &Plan, cfg: &VoiceConfig) -> Timeline {
                     (i + 1 < n_phones && flat[i + 1].word == item.word) as u8,
                     n_phones - i,
                     clause.punc,
+                    item.is_light as u8,
                 ));
             }
             let base = item.base;
@@ -461,17 +477,19 @@ pub fn build_timeline(plan: &Plan, cfg: &VoiceConfig) -> Timeline {
                 let wander = tune("acc_wander", 0.07) * variation * expressiveness.min(1.0);
                 if item.stress == 1 && item.is_nuclear_word {
                     accent_boost = tune("acc_nuc", 0.10) * acc + wander * rng.gauss();
+                } else if item.is_light {
+                    // said in full, but passed over by the melody
+                    accent_boost = -tune("acc_light", 0.0) * acc;
                 } else if item.stress == 1 && item.is_content {
                     let alternate = if (content_seen as i32) % 2 == 1 {
                         tune("acc_alt", 0.85)
                     } else {
                         1.0
                     };
-                    let aux_scale = if item.is_aux { tune("aux_acc", 0.35) } else { 1.0 };
-                    accent_boost = (tune("acc_first", 0.06) * alternate * acc + wander * rng.gauss()) * aux_scale;
-                    if !item.is_aux {
-                        content_seen += 1.0;
-                    }
+                    // (0.06 before the pronouns and auxiliaries lost their accents: the
+                    // movement they no longer make belongs to the words that carry meaning)
+                    accent_boost = tune("acc_first", 0.075) * alternate * acc + wander * rng.gauss();
+                    content_seen += 1.0;
                 } else if !item.is_content {
                     accent_boost = -tune("acc_func", 0.02) * acc;
                 }
@@ -509,6 +527,7 @@ pub fn build_timeline(plan: &Plan, cfg: &VoiceConfig) -> Timeline {
                 &durations::Context {
                     stress: item.stress,
                     is_content: item.is_content,
+                    light: item.is_light,
                     word_initial: item.is_word_initial,
                     word_final: item.is_word_final,
                     phrase_final_word: item.is_clause_final_word,
@@ -756,6 +775,7 @@ pub fn build_timeline(plan: &Plan, cfg: &VoiceConfig) -> Timeline {
                     seg_burst.s.fric_g1 = g1;
                     seg_burst.s.fric_g2 = g2;
                     seg_burst.s.fric_hp = low_cut;
+                    seg_burst.s.fric_lp = burst_ceiling(st.place, burst_f1);
                     // Lips already rounded for the next sound ("two", "tree", "twin") lengthen
                     // the cavity in front of the tongue, so the burst of /t d/ sits lower:
                     // measured 13% (a man) and 19% (a woman) lower than before unrounded sounds.
@@ -998,7 +1018,7 @@ pub fn build_timeline(plan: &Plan, cfg: &VoiceConfig) -> Timeline {
         let total_pause_ms = if is_sentence_break { tune("sentence_pause_ms", 400.0) } else { pause_ms }
             * pause_scale
             * clamp(rate_scale, 0.82, 1.18)
-            * rng.spread(0.25 * variation);
+            * rng.spread(tune("var_pause", 0.25) * variation);
         let breaths = cfg.breaths;
         let has_breath = is_sentence_break && !whisper && breaths > 0.01;
         let pre_phon_ms = if has_breath { (total_pause_ms * 0.14).clamp(35.0, 60.0) } else { 0.0 };

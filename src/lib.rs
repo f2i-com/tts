@@ -35,6 +35,7 @@ pub mod sing;
 pub mod tables;
 pub mod text;
 pub mod timeline;
+pub mod vocal;
 pub mod wasm;
 pub mod wav;
 
@@ -45,6 +46,7 @@ pub use plan::Plan;
 pub use render::{SAMPLES_PER_FRAME, SAMPLE_RATE};
 pub use script::{ScriptCue, ScriptedSpeech, SegmentSpan};
 pub use sing::{ChorusPart, ChorusScore, SingNote, SingScore};
+pub use vocal::{VocalSound, VOCAL_SOUNDS};
 
 use render::Renderer;
 
@@ -292,6 +294,35 @@ impl TTS {
     pub fn speak_script(&self, script_text: &str) -> ScriptedSpeech {
         let cues = script::parse_script_with_voices(script_text, &self.config, Some(&self.voices));
         script::synthesize_cues(&cues, &self.config, &self.lexicon)
+    }
+
+    /// A sound that is not a word, in this voice: `"laugh"`, `"giggle"`, `"sigh"`, `"cough"`,
+    /// `"hmm"`, `"whistle"` ... (the ids of [`VOCAL_SOUNDS`], or another name for one:
+    /// [`vocal::find`]). `intensity` (0..1, usually 0.6) is how strongly, `length` (1 = usual)
+    /// how long. `None` if there is no such sound.
+    ///
+    /// In a script the same sounds are tags: `"That is ridiculous! [laugh]"`.
+    pub fn vocalize(&self, name: &str, intensity: f64, length: f64) -> Option<Speech> {
+        self.vocal_cue(name, intensity, length, None)
+    }
+
+    /// Like [`TTS::vocalize`], lasting `seconds` as nearly as the sound allows: a longer laugh
+    /// has more calls in it, a longer sigh is drawn out, a hiccup stays a hiccup.
+    pub fn vocalize_for(&self, name: &str, intensity: f64, seconds: f64) -> Option<Speech> {
+        self.vocal_cue(name, intensity, 1.0, Some(seconds * 1000.0))
+    }
+
+    fn vocal_cue(&self, name: &str, intensity: f64, length: f64, duration_ms: Option<f64>) -> Option<Speech> {
+        let sound = vocal::find(name)?;
+        let cue = ScriptCue::Vocal {
+            sound,
+            intensity,
+            length,
+            duration_ms,
+            config: Box::new(self.config.clone()),
+            voice_label: self.config.gender.as_str().to_string(),
+        };
+        Some(script::synthesize_cues(&[cue], &self.config, &self.lexicon).speech)
     }
 
     /// Renders a structured slice of [`ScriptCue`]s.
@@ -922,6 +953,42 @@ mod tests {
     }
 
     #[test]
+    fn the_voice_marks_the_words_that_carry_meaning() {
+        let mut cfg = VoiceConfig::male();
+        cfg.variation = 0.0;
+        let base = cfg.pitch_hz;
+        let synth = Synth::new(cfg);
+        // highest pitch reached inside each word, in semitones re the voice's own pitch
+        let peaks = |text: &str| -> Vec<(String, f64)> {
+            let speech = synth.speak(text);
+            speech
+                .words
+                .iter()
+                .map(|w| {
+                    let top = speech
+                        .frames
+                        .iter()
+                        .filter(|f| f.t_sec >= w.start && f.t_sec < w.end && f.av > 0.4)
+                        .map(|f| semitones(f.f0, base))
+                        .fold(f64::NEG_INFINITY, f64::max);
+                    (w.word.clone(), top)
+                })
+                .collect()
+        };
+        // "I saw him": the main accent is on the verb, and the pronoun after it is passed over
+        let p = peaks("We really saw him.");
+        let (saw, him) = (p[2].1, p[3].1);
+        assert!(saw > him + 2.0, "saw {saw} him {him}");
+        // a pronoun and an auxiliary are hurried through like "the", not dwelt on like a noun
+        let speech = synth.speak("The cat would sit on the mat today.");
+        let dur = |i: usize| speech.words[i].end - speech.words[i].start;
+        assert!(dur(2) < 0.75 * dur(1), "would {} vs cat {}", dur(2), dur(1));
+        let speech = synth.speak("He sat there and Tom sat there.");
+        let dur = |i: usize| speech.words[i].end - speech.words[i].start;
+        assert!(dur(0) < 0.8 * dur(4), "he {} vs tom {}", dur(0), dur(4));
+    }
+
+    #[test]
     fn tone_controls_shape_the_voice_without_touching_timing() {
         // Energy of the sample-to-sample differences relative to the signal: grows with treble.
         fn treble(x: &[f32]) -> f64 {
@@ -1269,6 +1336,178 @@ mod tests {
             .any(|f| f.av > 0.5);
         assert!(!seg2_voiced, "whisper segment is unvoiced");
         assert!(seg3_voiced, "[woman_a, reset] restores modal voicing");
+    }
+
+    #[test]
+    fn scripts_laugh_sigh_and_cough() {
+        let synth = Synth::default();
+        let plain = synth.speak_script("[female] That is ridiculous!");
+        let res = synth.speak_script("[female] That is ridiculous! [laugh] [deep] Hmm. [sigh] [cough=strong] Quite.");
+        // the sounds take their place among the words and the segments, each by its speaker
+        let words: Vec<&str> = res.speech.words.iter().map(|w| w.word.as_str()).collect();
+        assert_eq!(words, ["that", "is", "ridiculous", "[laugh]", "hmm", "[sigh]", "[cough]", "quite"]);
+        let sounds: Vec<Option<&str>> = res.segments.iter().map(|s| s.sound).collect();
+        assert_eq!(sounds, [None, Some("laugh"), None, Some("sigh"), Some("cough"), None]);
+        assert_eq!(res.segments[1].gender, Gender::Female);
+        assert_eq!(res.segments[1].voice, "female");
+        assert_eq!(res.segments[3].voice, "deep");
+        assert!(res.speech.duration() > plain.speech.duration() + 1.5);
+        assert!(res.speech.samples.iter().all(|s| s.is_finite() && s.abs() <= 1.0));
+        for pair in res.speech.words.windows(2) {
+            assert!(pair[0].end <= pair[1].start + 1e-9);
+        }
+        // the laugh is the woman's: its calls are far above the deep voice that follows
+        let laugh = &res.segments[1];
+        let top = res
+            .speech
+            .frames
+            .iter()
+            .filter(|f| f.t_sec >= laugh.start && f.t_sec < laugh.end && f.av > 0.3)
+            .map(|f| f.f0)
+            .fold(0.0, f64::max);
+        assert!(top > 330.0, "the laugh reaches {top} Hz");
+
+        // how strongly and how long: `name=`, or `intensity=` / `length=` after it
+        let secs = |script: &str| synth.speak_script(script).speech.duration();
+        assert!(secs("[laugh length=2]") > secs("[laugh]") * 1.4);
+        assert!(secs("[laugh=long]") > secs("[laugh]") * 1.2);
+        assert!(secs("[giggle short]") < secs("[giggle]"));
+        let level = |script: &str| rms(&synth.speak_script(&format!("We are all here. {script}")).speech.samples);
+        assert!(level("[laugh intensity=0.1]") < level("[laugh intensity=1]"));
+        // other names for the same sounds; what is no tag at all stays text
+        assert_eq!(synth.speak_script("[haha]").segments[0].sound, Some("laugh"));
+        assert_eq!(synth.speak_script("[uh-huh]").segments[0].sound, Some("uh-huh"));
+        let literal = synth.speak_script("see note [laughable] here");
+        assert!(literal.segments.iter().all(|s| s.sound.is_none()));
+        // a voice registered under a sound's name is still that voice
+        let mut named = Synth::default();
+        named.register_voice("giggle", VoiceConfig::female());
+        let res = named.speak_script("[giggle] Hello.");
+        assert_eq!(res.segments.len(), 1);
+        assert_eq!(res.segments[0].sound, None);
+
+        // from code
+        let laugh = synth.vocalize("laugh", 0.6, 1.0).unwrap();
+        assert!(laugh.duration() > 0.8 && laugh.duration() < 3.0);
+        assert_eq!(laugh.words.len(), 1);
+        assert_eq!(laugh.text, "[laugh]");
+        let peak = laugh.samples.iter().fold(0.0f32, |m, v| m.max(v.abs()));
+        assert!(peak > 0.5, "peak {peak}");
+        assert!(synth.vocalize("no such sound", 0.6, 1.0).is_none());
+    }
+
+    #[test]
+    fn sounds_last_as_long_as_asked() {
+        let synth = Synth::new(VoiceConfig::female());
+        let secs = |script: &str| synth.speak_script(script).speech.duration();
+        // a longer laugh has more calls in it, a longer sigh is drawn out
+        for (script, want) in [("[laugh=3s]", 3.0), ("[laugh duration=0.8s]", 0.8), ("[sigh 2s]", 2.0), ("[giggle duration=4]", 4.0), ("[shh=2500ms]", 2.5), ("[snore for=5s]", 5.0)] {
+            let got = secs(script);
+            assert!((got - want).abs() < 0.12, "{script}: {got} s");
+        }
+        let calls = |script: &str| {
+            let res = synth.speak_script(script);
+            let mut n = 0;
+            let mut on = false;
+            for f in &res.speech.frames {
+                if f.av > 0.25 && !on {
+                    n += 1;
+                }
+                on = f.av > 0.25;
+            }
+            n
+        };
+        assert!(calls("[laugh=3s]") >= calls("[laugh]") + 4, "{} vs {}", calls("[laugh=3s]"), calls("[laugh]"));
+        // what cannot be longer stays what it is
+        assert!(secs("[hiccup=3s]") < 0.8);
+        // from code, and next to speech
+        let laugh = synth.vocalize_for("laugh", 0.6, 2.0).unwrap();
+        assert!((laugh.duration() - 2.0).abs() < 0.12, "{}", laugh.duration());
+        let plain = secs("Well then.");
+        assert!((secs("Well then. [sigh=1.5s]") - plain - 1.5).abs() < 0.15);
+        // a bare number after the name is how strongly, not how long
+        assert!((secs("[laugh=0.9]") - secs("[laugh]")).abs() < 0.7);
+    }
+
+    #[test]
+    fn laughing_while_speaking_changes_the_voice_and_keeps_the_words() {
+        let text = "I can't believe you actually did that! That is the funniest thing I have heard all week.";
+        let mut cfg = VoiceConfig::female();
+        cfg.variation = 0.0;
+        let plain = Synth::new(cfg.clone()).speak(text);
+        let median_pitch = |s: &Speech| {
+            let mut f0: Vec<f64> = s.frames.iter().filter(|f| f.av > 0.4 && f.word >= 0).map(|f| f.f0).collect();
+            f0.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            f0[f0.len() / 2]
+        };
+        // breath between two stretches of voice inside one word: the laugh breaking in
+        let breaks = |s: &Speech| {
+            let mut n = 0;
+            for w in 0..s.words.len() as i32 {
+                let fr: Vec<&Frame> = s.frames.iter().filter(|f| f.word == w).collect();
+                for k in 1..fr.len().saturating_sub(1) {
+                    if fr[k].phone.is_vowel() && fr[k].av < 0.12 && fr[k].ah > 0.2 && fr[k - 1].av >= 0.12 {
+                        n += 1;
+                    }
+                }
+            }
+            n
+        };
+        assert_eq!(breaks(&plain), 0);
+
+        // a little: a smile in the voice - higher, breathier, the same length and words
+        cfg.laughter = 0.12;
+        let smiling = Synth::new(cfg.clone()).speak(text);
+        assert_eq!(smiling.samples.len(), plain.samples.len());
+        assert!(semitones(median_pitch(&smiling), median_pitch(&plain)) > 0.2);
+        assert!(smiling.samples != plain.samples);
+
+        // more: the laugh breaks into stressed vowels and comes out after the sentence
+        cfg.laughter = 0.7;
+        let laughing = Synth::new(cfg.clone()).speak(text);
+        assert_eq!(laughing.words.len(), plain.words.len());
+        assert_eq!(laughing.text, plain.text);
+        assert!(laughing.duration() > plain.duration() + 0.4, "{} vs {}", laughing.duration(), plain.duration());
+        assert!(semitones(median_pitch(&laughing), median_pitch(&plain)) > 1.0);
+        assert!(breaks(&laughing) >= 2, "{} breaks", breaks(&laughing));
+        // (frames after the last word that are voiced: the laugh that follows it)
+        let after_words = laughing.words.last().unwrap().end;
+        assert!(laughing.frames.iter().any(|f| f.t_sec > after_words + 0.05 && f.av > 0.3), "a laugh after the sentence");
+        assert!(laughing.samples.iter().all(|v| v.is_finite() && v.abs() <= 1.0));
+        for pair in laughing.words.windows(2) {
+            assert!(pair[0].end <= pair[1].start + 1e-9);
+        }
+        // the same take is the same performance, in one piece or streamed
+        assert_eq!(Synth::new(cfg.clone()).speak(text).samples, laughing.samples);
+        let mut stream = Synth::new(cfg.clone()).stream(text);
+        let mut total = 0;
+        let mut buf = vec![0.0f32; 4096];
+        loop {
+            let got = stream.read(&mut buf);
+            if got == 0 {
+                break;
+            }
+            total += got;
+        }
+        assert!((total as f64 / SAMPLE_RATE as f64 - laughing.duration()).abs() < 0.05);
+        // a whisper has no voice to laugh with
+        cfg.whisper = true;
+        assert!(Synth::new(cfg).speak(text).frames.iter().all(|f| f.av == 0.0));
+
+        // in a script it is a delivery that starts and stops
+        let synth = Synth::new(VoiceConfig::female());
+        let res = synth.speak_script("[laughing] You should have seen his face! [/laughing] Anyway. [laughter=0.9] Stop it! [reset] Fine.");
+        assert_eq!(res.segments.len(), 4);
+        let seg_pitch = |k: usize| {
+            let sg = &res.segments[k];
+            let mut f0: Vec<f64> = res.speech.frames.iter().filter(|f| f.t_sec >= sg.start && f.t_sec < sg.end && f.av > 0.4 && f.word >= 0).map(|f| f.f0).collect();
+            f0.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            f0[f0.len() / 2]
+        };
+        assert!(seg_pitch(0) > seg_pitch(1) * 1.04, "{} vs {}", seg_pitch(0), seg_pitch(1));
+        assert!(res.segments.iter().all(|sg| sg.sound.is_none()));
+        // ... and `[laughing]` is not the sound `[laugh]`
+        assert!(synth.speak_script("[laughing] Hello there.").speech.words.iter().all(|w| !w.word.starts_with('[')));
     }
 
     #[test]

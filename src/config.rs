@@ -102,6 +102,10 @@ pub struct VoiceConfig {
     /// heard. 0 = none (a formant synthesizer's usual dull vowels), 1 = the level measured in
     /// real speakers. See [`DEFAULT_AIR`].
     pub air: f64,
+    /// 0..1 - how much the speaker is laughing while speaking. A little is a smile in the
+    /// voice (lips spread, pitch up, breath in it); more, and the laugh breaks into the
+    /// stressed vowels, which are drawn out and shake with it ("I ca-ha-han't believe it").
+    pub laughter: f64,
     /// How abruptly the vocal folds shut at the end of each cycle: 0 = gently (a soft, dark
     /// voice), 1 = sharply (bright, with harmonics far up). This is the tone of the voice at
     /// its source. Defaults: 0.75 for the male voice, 0.25 for the female one - the values
@@ -232,6 +236,7 @@ impl VoiceConfig {
             room: 0.25,
             pitch_coupling: 0.0,
             air: DEFAULT_AIR,
+            laughter: 0.0,
             closure: MALE_CLOSURE,
         }
     }
@@ -295,6 +300,7 @@ impl VoiceConfig {
             "pitchCoupling" => &mut self.pitch_coupling,
             "air" => &mut self.air,
             "closure" => &mut self.closure,
+            "laughter" => &mut self.laughter,
             _ => return None,
         })
     }
@@ -337,6 +343,7 @@ impl VoiceConfig {
         self.room = clamp_setting(self.room, 0.0, 1.0);
         self.pitch_coupling = clamp_setting(self.pitch_coupling, 0.0, 1.0);
         self.air = clamp_setting(self.air, 0.0, 1.0);
+        self.laughter = clamp_setting(self.laughter, 0.0, 1.0);
         self.closure = clamp_setting(self.closure, 0.0, 1.0);
         self.pauses = clamp_setting(self.pauses, 0.3, 3.0);
         self.breaths = clamp_setting(self.breaths, 0.0, 1.0);
@@ -496,10 +503,11 @@ impl Default for VoiceConfig {
 }
 
 /// Names of the numeric settings, as [`VoiceConfig::number_mut`] takes them.
-pub const NUMBER_SETTINGS: [&str; 24] = [
+pub const NUMBER_SETTINGS: [&str; 25] = [
     "pitchHz", "tractLengthCm", "speed", "warmth", "chestResonance", "breathiness", "nasality", "roughness",
     "crispness", "expressiveness", "vibrato", "volume", "variation", "bass", "presence", "brightness",
     "pauses", "breaths", "openQuotient", "subglottal", "room", "pitchCoupling", "air", "closure",
+    "laughter",
 ];
 
 /// A built-in voice: one of the two plain voices with a few settings changed, so that

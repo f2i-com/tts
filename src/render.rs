@@ -506,6 +506,11 @@ struct State {
     asp_lp2: f64,
     hp_x: [f64; 4],
     hp_y: [f64; 4],
+    /// Memory of the ceiling on the frication noise (two sections).
+    flp: [f64; 4],
+    /// Phase of the whistled tone, and the slow wander of its level.
+    tone_phase: f64,
+    tone_drift: f64,
     hnm_prev: f64,
     hnm_lp: f64,
     prev_par_in: f64,
@@ -593,6 +598,9 @@ impl State {
             asp_lp2: 0.0,
             hp_x: [0.0; 4],
             hp_y: [0.0; 4],
+            flp: [0.0; 4],
+            tone_phase: 0.0,
+            tone_drift: 0.0,
             hnm_prev: 0.0,
             hnm_lp: 0.0,
             prev_par_in: 0.0,
@@ -721,6 +729,15 @@ fn high_pass(w0: f64, q: f64) -> (f64, f64, f64) {
     ((1.0 + cos_w) * 0.5 / a0, -2.0 * cos_w / a0, (1.0 - alpha) / a0)
 }
 
+/// A second-order low-pass at `w0` (radians per sample) with quality `q`, as
+/// `y = b0 (x + 2 x1 + x2) - a1 y1 - a2 y2`: returns (b0, a1, a2).
+fn low_pass(w0: f64, q: f64) -> (f64, f64, f64) {
+    let (sin_w, cos_w) = (w0.sin(), w0.cos());
+    let alpha = sin_w / (2.0 * q);
+    let a0 = 1.0 + alpha;
+    ((1.0 - cos_w) * 0.5 / a0, -2.0 * cos_w / a0, (1.0 - alpha) / a0)
+}
+
 /// Gain that brings a signal with the given absolute peak to 0.86 full scale, limited so
 /// quiet passages are not blown up (max ×3.2) and loud ones not crushed (min ×0.65).
 pub fn normalization_gain(peak_abs: f64) -> f64 {
@@ -842,6 +859,9 @@ fn silent_tail_frame(base_ref_f0: f64) -> Frame {
         fric_g1: 0.0,
         fric_g2: 0.0,
         fric_hp: 0.0,
+        fric_lp: 0.0,
+        tone_hz: 1500.0,
+        tone: 0.0,
         is_closure: false,
         is_burst: false,
         stress: 0,
@@ -1256,6 +1276,8 @@ impl Renderer {
                 && f_next.af < 0.0004
                 && f_cur.avb < 0.0004
                 && f_next.avb < 0.0004
+                && f_cur.tone < 0.0004
+                && f_next.tone < 0.0004
                 && s.y1_1.abs() < 0.0001
                 && s.y1_2.abs() < 0.0001
                 && s.y2_1.abs() < 0.0001
@@ -1312,6 +1334,10 @@ impl Renderer {
                 let oral_seal = lerp(f_cur.oral_seal, f_next.oral_seal);
                 let lax = lerp(f_cur.lax, f_next.lax);
                 let creak = lerp(f_cur.creak, f_next.creak);
+                // A whistle is not made by the folds or by turbulence but by the air in the
+                // mouth ringing behind the lips: a nearly pure tone.
+                let tone = lerp(f_cur.tone, f_next.tone);
+                let tone_inc = lerp(f_cur.tone_hz, f_next.tone_hz).clamp(100.0, 6000.0) * inv_fs;
 
                 if f2 < f1 + 170.0 {
                     f2 = f1 + 170.0;
@@ -1366,6 +1392,7 @@ impl Renderer {
                 let (mut rf1, mut bf1, mut cf1, mut gf1) = (0.0, 0.0, 0.0, 0.0);
                 let (mut rf2, mut bf2, mut cf2, mut gf2) = (0.0, 0.0, 0.0, 0.0);
                 let (mut hp_on, mut hp_b0, mut hp_a1, mut hp_a2) = (false, 0.0, 0.0, 0.0);
+                let mut lp: Option<[(f64, f64, f64); 2]> = None;
                 if has_fric {
                     let fr_f1 = lerp(f_cur.fric_f1, f_next.fric_f1);
                     let fr_b1 = lerp(f_cur.fric_b1, f_next.fric_b1);
@@ -1388,6 +1415,22 @@ impl Renderer {
                     if hp_on {
                         (hp_b0, hp_a1, hp_a2) = high_pass(TAU * hp_hz.min(9000.0) * inv_fs, HIGH_PASS_Q);
                     }
+                    // ... and a 4th-order ceiling where the noise has one (the compact burst
+                    // of /k g/, the dull one of /p b/). A frame without one has no say in
+                    // where its neighbour's lies.
+                    let lp_hz = match (f_cur.fric_lp > 0.0, f_next.fric_lp > 0.0) {
+                        (true, true) => lerp(f_cur.fric_lp, f_next.fric_lp),
+                        (true, false) => f_cur.fric_lp,
+                        (false, true) => f_next.fric_lp,
+                        (false, false) => 0.0,
+                    };
+                    if lp_hz > 0.0 {
+                        let w0 = TAU * clamp(lp_hz, 300.0, 10500.0) * inv_fs;
+                        lp = Some([low_pass(w0, 0.5412), low_pass(w0, 1.3066)]);
+                    }
+                }
+                if lp.is_none() {
+                    s.flp = [0.0; 4];
                 }
 
                 // Laryngeal micro-flutter, vibrato, jitter and shimmer.
@@ -1740,6 +1783,14 @@ impl Renderer {
                                 fric_out = y;
                             }
                         }
+                        if let Some(sections) = &lp {
+                            for (k, &(b0, a1, a2)) in sections.iter().enumerate() {
+                                let y = b0 * fric_out + s.flp[2 * k];
+                                s.flp[2 * k] = 2.0 * b0 * fric_out - a1 * y + s.flp[2 * k + 1];
+                                s.flp[2 * k + 1] = b0 * fric_out - a2 * y;
+                                fric_out = y;
+                            }
+                        }
                     }
 
                     // Mix, a whisper of early room reflection, DC blocker, soft limiter
@@ -1754,7 +1805,18 @@ impl Renderer {
                             voiced_out = y;
                         }
                     }
-                    let dry = voiced_out + fric_out + asp_air + top_out;
+                    let mut dry = voiced_out + fric_out + asp_air + top_out;
+                    if tone > 0.0004 {
+                        s.tone_phase += tone_inc;
+                        if s.tone_phase >= 1.0 {
+                            s.tone_phase -= 1.0;
+                        }
+                        // (the breath that drives it is never quite steady)
+                        s.rng = xorshift(s.rng);
+                        let n = (s.rng & 0xffff) as f64 * 0.000030517578125 - 1.0;
+                        s.tone_drift += (n - s.tone_drift) * 0.0015;
+                        dry += (TAU * s.tone_phase).sin() * tone * 1.6 * (1.0 + 2.5 * s.tone_drift);
+                    }
                     let r_tap1 = self.room_buf[s.room_idx.wrapping_sub(203) & 511] as f64;
                     let r_tap2 = self.room_buf[s.room_idx.wrapping_sub(347) & 511] as f64;
                     self.room_buf[s.room_idx] = dry as f32;

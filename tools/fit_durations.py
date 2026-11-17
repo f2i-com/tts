@@ -29,7 +29,7 @@ from transplant import labels, match  # noqa: E402
 DATA = E.CACHE / "durations.tsv"
 TRAIN = range(17, 281)  # sentences 1-16 are the evaluation set; 281-320 are held out
 TEST = range(281, 321)
-COLS = "utt spk token phone stress content w_init w_final cf_word nuclear n_sylls last_syl onset_stress prev next prev_same next_same to_end punc rule_ms nat_ms".split()
+COLS = "utt spk token phone stress content w_init w_final cf_word nuclear n_sylls last_syl onset_stress prev next prev_same next_same to_end punc light rule_ms nat_ms".split()
 VOWELS = {"IY", "IH", "EH", "AE", "AA", "AO", "UH", "UW", "AH", "AX", "ER", "EY", "AY", "OY", "AW", "OW"}
 STOPS = {"P", "B", "T", "D", "K", "G", "CH", "JH"}
 VOICELESS = {"P", "T", "K", "CH", "F", "TH", "S", "SH", "HH"}
@@ -77,7 +77,7 @@ def load() -> list[dict]:
     out = []
     for line in lines[1:]:
         d = dict(zip(COLS, line.split("\t")))
-        for k in ("utt", "token", "stress", "content", "w_init", "w_final", "cf_word", "nuclear", "n_sylls", "last_syl", "onset_stress", "prev_same", "next_same", "to_end"):
+        for k in ("utt", "token", "stress", "content", "w_init", "w_final", "cf_word", "nuclear", "n_sylls", "last_syl", "onset_stress", "prev_same", "next_same", "to_end", "light"):
             d[k] = int(d[k])
         d["rule_ms"] = float(d["rule_ms"])
         d["nat_ms"] = float(d["nat_ms"])
@@ -109,6 +109,8 @@ def features(d: dict) -> list[str]:
             f.append("v_next:liquid")
         if not d["prev_same"]:
             f.append("v_word_initial")
+        if d["light"]:
+            f.append("v_light_final" if d["cf_word"] else "v_light")
     else:
         prev_cons = d["prev_same"] and prv not in VOWELS
         next_cons = d["next_same"] and nxt not in VOWELS
@@ -128,6 +130,8 @@ def features(d: dict) -> list[str]:
             f.append("c_function")
         if ph in ("T", "D") and prv in VOWELS and nxt in VOWELS and d["onset_stress"] != 1 and not d["w_init"]:
             f.append("c_flap")
+        if d["light"]:
+            f.append("c_light_final" if d["cf_word"] else "c_light")
     return f
 
 
@@ -210,6 +214,8 @@ def fit() -> None:
         ("V_BEFORE_VOWEL", "v_next:vowel", "hiatus"),
         ("V_BEFORE_LIQUID", "v_next:liquid", "the liquid/glide takes over part of the vowel"),
         ("V_WORD_INITIAL", "v_word_initial", "word starts with this vowel"),
+        ("V_LIGHT", "v_light", "a word said in full but not accented (\"about\", \"because\")"),
+        ("V_LIGHT_FINAL", "v_light_final", "a pronoun at the very end of a phrase"),
         ("C_INITIAL_CONTENT", "c_initial:c", "first sound of a content word"),
         ("C_INITIAL_FUNCTION", "c_initial:f", "first sound of a function word"),
         ("C_FINAL", "c_final", "last sound of a word"),
@@ -220,6 +226,8 @@ def fit() -> None:
         ("C_STRESSED_ONSET", "c_stressed_onset", "starts a stressed syllable"),
         ("C_FUNCTION", "c_function", "inside a function word"),
         ("C_FLAP", "c_flap", "t/d between vowels before an unstressed syllable"),
+        ("C_LIGHT", "c_light", "inside a word said in full but not accented"),
+        ("C_LIGHT_FINAL", "c_light_final", "inside a pronoun at the very end of a phrase"),
     ]
     const_lines = "\n".join(f"const {name}: f64 = {g(key):.3f}; // {doc}" for name, key, doc in consts)
     rust = RUST_TEMPLATE.replace("@BASES@", bases).replace("@CONSTS@", const_lines)
@@ -242,8 +250,11 @@ use crate::phone::Ph;
 /// What the timeline knows about a phone's surroundings.
 pub(crate) struct Context {
     pub stress: u8,
-    /// False for function words (the, of, and ...) that are not phrase-final.
+    /// False for the weak words (the, of, he, would ...) that are not phrase-final.
     pub is_content: bool,
+    /// A word said in full but without an accent of its own: a longer preposition or a
+    /// conjunction, or a pronoun at the very end of a phrase.
+    pub light: bool,
     pub word_initial: bool,
     pub word_final: bool,
     /// The phone belongs to the last word before a pause.
@@ -306,6 +317,9 @@ pub(crate) fn duration_ms(ph: Ph, c: &Context) -> f64 {
         if !c.prev_same_word {
             d *= V_WORD_INITIAL;
         }
+        if c.light {
+            d *= if c.phrase_final_word { V_LIGHT_FINAL } else { V_LIGHT };
+        }
     } else {
         let after_consonant = c.prev_same_word && !c.prev.is_vowel();
         let before_consonant = c.next_same_word && !c.next.is_vowel();
@@ -336,6 +350,9 @@ pub(crate) fn duration_ms(ph: Ph, c: &Context) -> f64 {
             && !c.word_initial
         {
             d *= C_FLAP;
+        }
+        if c.light {
+            d *= if c.phrase_final_word { C_LIGHT_FINAL } else { C_LIGHT };
         }
     }
     d

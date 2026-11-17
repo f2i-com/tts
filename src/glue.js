@@ -231,6 +231,19 @@ function bindTTS(w) {
       return META.styleNames.slice();
     }
 
+    /**
+     * The sounds that are not words — laughs, sighs, coughs, "mm-hm", whistles … — as
+     * `[{ id, label, group, about }]`. Each `id` is a script tag (`[laugh]`) and a name for
+     * `voice.sound(id)`.
+     */
+    static sounds() {
+      return structuredClone(META.sounds);
+    }
+
+    static soundNames() {
+      return META.sounds.map((s) => s.id);
+    }
+
     static noteToHz(note) {
       const [ptr, len] = writeUtf8(String(note));
       const hz = w.tts_note_to_hz(ptr, len);
@@ -389,6 +402,34 @@ function bindTTS(w) {
       return copyBytes();
     }
 
+    #packSound(name, options) {
+      if (typeof name !== "string" || !name.trim()) {
+        throw new Error("sound expects the name of a vocal sound, e.g. \"laugh\"");
+      }
+      const cue = { sound: name };
+      if (options && typeof options === "object") {
+        if (options.intensity !== undefined) cue.intensity = options.intensity;
+        if (options.length !== undefined) cue.length = options.length;
+        if (options.durationMs !== undefined) cue.durationMs = options.durationMs;
+      }
+      return [cue];
+    }
+
+    /**
+     * A sound that is not a word, in this voice: `voice.sound("laugh")`,
+     * `voice.sound("giggle", { intensity: 0.9, length: 1.5 })`, `voice.sound("sigh", { durationMs: 1500 })`.
+     * `intensity` is 0..1 (0.6 is the usual) or "gentle" / "strong"; `length` is a factor
+     * (1 = usual) or "short" / "long"; `durationMs` asks for a duration instead.
+     * See `TTS.sounds()` for the list. In a script the same sounds are tags: `[laugh]`.
+     */
+    sound(name, options) {
+      return this.speakScript(this.#packSound(name, options));
+    }
+
+    soundWav(name, options) {
+      return this.speakScriptWav(this.#packSound(name, options));
+    }
+
     #packSingArgs(score, lyrics, bpm) {
       if (typeof score === "string") {
         if (lyrics === undefined && bpm === undefined) return score;
@@ -456,6 +497,11 @@ function bindTTS(w) {
     /** Performs a multi-voice / inline-controlled script directly through Web Audio. */
     async playScript(script, audioContext) {
       return playSpeechInBrowser(this.speakScript(script), audioContext);
+    }
+
+    /** Makes a vocal sound (a laugh, a sigh …) directly through Web Audio. */
+    async playSound(name, options, audioContext) {
+      return playSpeechInBrowser(this.sound(name, options), audioContext);
     }
 
     /** Sings a solo melody directly through Web Audio. */

@@ -3,8 +3,9 @@
 //!
 //! A script lets a writer or an AI agent steer the physical vocal tract mid-utterance —
 //! speeding up, slowing down, raising expressiveness, shifting pitch in Hz or semitones,
-//! whispering, inserting pauses or breaths, switching between male and female speakers,
-//! or breaking into song — all from a single string or a structured list of [`ScriptCue`]s:
+//! whispering, inserting pauses or breaths, laughing, sighing or coughing, switching between
+//! male and female speakers, or breaking into song — all from a single string or a structured
+//! list of [`ScriptCue`]s:
 //!
 //! ```text
 //! [female, cheerful, speed=1.08] Hey! Have you heard what this browser vocal tract can do?
@@ -12,7 +13,17 @@
 //! [deep, calm, speed=0.94] Tell me — I'm all ears.
 //! [bright, excited] It can switch voices mid-script, [slow, whisper] drop to a secret whisper,
 //! [bright, sing bpm=116] C5:0.5=and E5:0.5=burst G5:1.5=in- E5:0.5=to C5:1.5=song! [/sing]
+//! [deep] Well. [chuckle] That was something. [sigh]
 //! ```
+//!
+//! The sounds that are not words - `[laugh]`, `[giggle]`, `[sigh]`, `[cough]`, `[hmm]`,
+//! `[whistle]` and the rest of [`crate::vocal::VOCAL_SOUNDS`] - are made by the voice that is
+//! speaking at that point, and take `intensity=` (0..1) and `length=` (1 = usual) or a
+//! `duration=`: `[laugh intensity=0.9 length=1.5]`, `[sigh duration=1.2s]`, or `[laugh=0.9]`
+//! and `[laugh=2s]` for short.
+//!
+//! Laughing *while* speaking is a delivery, not a sound: `[laughing] I can't believe it!`
+//! (or `[laughter=0.8]`) changes the voice itself until `[/laughing]` or `[reset]`.
 
 use std::collections::HashMap;
 
@@ -25,6 +36,7 @@ use crate::render::{normalization_gain, Renderer, SAMPLES_PER_FRAME, SAMPLE_RATE
 use crate::sing::{self, SingScore};
 use crate::tables;
 use crate::timeline::{self, clamp};
+use crate::vocal::{self, VocalSound};
 use crate::{soft_limit, Speech, WordTiming, FRAME_RATE};
 
 const FRAME_SEC: f64 = FRAME_MS / 1000.0;
@@ -39,6 +51,8 @@ pub struct SegmentSpan {
     pub pitch_hz: f64,
     pub tract_length_cm: f64,
     pub singing: bool,
+    /// For a sound that is not a word (a laugh, a sigh ...), its id; `None` for speech and song.
+    pub sound: Option<&'static str>,
 }
 
 /// A rendered scripted performance: standard [`Speech`] plus per-segment speaker spans.
@@ -71,6 +85,72 @@ pub enum ScriptCue {
         config: Box<VoiceConfig>,
         voice_label: String,
     },
+    /// A sound that is not a word - a laugh, a sigh, a cough (see [`crate::vocal`]) - made by
+    /// the voice `config`: `intensity` in `0..=1` (0.6 is the usual), `length` 1 = usual; or
+    /// as long as `duration_ms` says, as nearly as the sound allows (a hiccup stays a hiccup).
+    Vocal {
+        sound: &'static VocalSound,
+        intensity: f64,
+        length: f64,
+        duration_ms: Option<f64>,
+        config: Box<VoiceConfig>,
+        voice_label: String,
+    },
+}
+
+/// The usual strength of a vocal sound.
+pub const VOCAL_INTENSITY: f64 = 0.6;
+
+/// How strongly a sound is asked for: a number in 0..1 (or a percentage), or a word for one.
+pub fn parse_intensity(raw: &str) -> Option<f64> {
+    let s = raw.trim().to_ascii_lowercase();
+    match s.as_str() {
+        "faint" | "tiny" | "barely" => Some(0.15),
+        "soft" | "gentle" | "quiet" | "small" | "light" => Some(0.35),
+        "medium" | "normal" | "mid" => Some(VOCAL_INTENSITY),
+        "strong" | "loud" | "big" | "hard" => Some(0.85),
+        "max" | "full" | "huge" => Some(1.0),
+        _ => {
+            let percent = s.ends_with('%');
+            let v: f64 = s.trim_end_matches('%').parse().ok()?;
+            if !v.is_finite() {
+                return None;
+            }
+            Some(clamp(if percent || v > 1.0 { v / 100.0 } else { v }, 0.0, 1.0))
+        }
+    }
+}
+
+/// How long a sound is asked to last, in milliseconds: a number with its unit (`2s`,
+/// `800ms`). A bare number is not a duration (it is a strength or a factor).
+pub fn parse_duration_ms(raw: &str) -> Option<f64> {
+    let s = raw.trim().to_ascii_lowercase();
+    let (number, scale) = if let Some(ms) = s.strip_suffix("ms") {
+        (ms, 1.0)
+    } else if let Some(sec) = s.strip_suffix("sec") {
+        (sec, 1000.0)
+    } else if let Some(sec) = s.strip_suffix('s') {
+        (sec, 1000.0)
+    } else {
+        return None;
+    };
+    let v: f64 = number.trim().parse().ok()?;
+    (v.is_finite() && v > 0.0).then(|| clamp(v * scale, 50.0, 30_000.0))
+}
+
+/// How long a sound is asked to be against its usual length: a factor, or a word for one.
+pub fn parse_length(raw: &str) -> Option<f64> {
+    let s = raw.trim().to_ascii_lowercase();
+    match s.as_str() {
+        "short" | "brief" | "quick" => Some(0.6),
+        "normal" | "medium" => Some(1.0),
+        "long" => Some(1.6),
+        "verylong" | "endless" => Some(2.4),
+        _ => {
+            let v: f64 = s.trim_start_matches('x').trim_end_matches('x').parse().ok()?;
+            v.is_finite().then(|| clamp(v, 0.25, 4.0))
+        }
+    }
 }
 
 /// Resolves any built-in voice preset, gender, choir archetype, or fitted speaker profile
@@ -194,6 +274,7 @@ pub fn resolve_voice(
 pub(crate) enum ImmediateAction {
     PauseMs(f64),
     Inhale { duration_ms: f64, intensity: f64 },
+    Vocal { sound: &'static VocalSound, intensity: f64, length: f64, duration_ms: Option<f64> },
     StartSing { bpm: Option<f64> },
     EndSing,
 }
@@ -289,6 +370,22 @@ pub fn apply_style_preset(cfg: &mut VoiceConfig, style: &str) -> bool {
             cfg.whisper = false;
             true
         }
+        // laughing while speaking: the laugh comes through the words
+        "laughing" | "amused" => {
+            cfg.whisper = false;
+            cfg.laughter = 0.6;
+            true
+        }
+        "chuckling" | "smiling" => {
+            cfg.whisper = false;
+            cfg.laughter = 0.3;
+            true
+        }
+        "giggling" | "helpless" => {
+            cfg.whisper = false;
+            cfg.laughter = 0.9;
+            true
+        }
         _ => false,
     }
 }
@@ -368,6 +465,10 @@ fn try_parse_bracket_tag(
         cfg.breathiness = speaker_cfg.breathiness;
         return Ok(Vec::new());
     }
+    if ["/laughing", "/laughter", "/chuckling", "/giggling", "/smiling", "/amused"].iter().any(|t| trimmed.eq_ignore_ascii_case(t)) {
+        cfg.laughter = speaker_cfg.laughter;
+        return Ok(Vec::new());
+    }
     if trimmed.eq_ignore_ascii_case("/voice")
         || trimmed.eq_ignore_ascii_case("base_voice")
         || trimmed.eq_ignore_ascii_case("default_voice")
@@ -440,12 +541,48 @@ fn try_parse_bracket_tag(
             continue;
         }
 
-        if matches!(low.as_str(), "inhale" | "breath_in" | "gasp" | "sigh_in") {
-            let intensity = if low == "gasp" { 0.85 } else { 0.55 };
+        // (a soft breath between phrases; `gasp` and the other breath sounds are in `vocal`)
+        if matches!(low.as_str(), "inhale" | "breath_in" | "sigh_in") {
             actions.push(ImmediateAction::Inhale {
-                duration_ms: if low == "gasp" { 190.0 } else { 150.0 },
-                intensity,
+                duration_ms: 150.0,
+                intensity: 0.55,
             });
+            i += 1;
+            continue;
+        }
+
+        // A sound that is not a word: `laugh`, `sigh`, `giggle intensity=0.8 length=1.5`,
+        // `laugh long`, `chuckle gentle`. (A voice registered under that name comes first.)
+        let is_voice_name = custom_voices.is_some_and(|m| m.contains_key(&low.replace('-', "_")));
+        if let Some(sound) = vocal::find(&low).filter(|_| !is_voice_name) {
+            let (mut intensity, mut length) = (VOCAL_INTENSITY, 1.0);
+            let mut duration_ms = None;
+            while i + 1 < raw_parts.len() {
+                let next = raw_parts[i + 1];
+                let next_low = next.to_ascii_lowercase();
+                if let Some((k, v)) = next.split_once('=').or_else(|| next.split_once(':')) {
+                    match k.to_ascii_lowercase().as_str() {
+                        "intensity" | "strength" | "level" => intensity = parse_intensity(v).ok_or(())?,
+                        "length" | "len" | "x" => length = parse_length(v).ok_or(())?,
+                        // `duration=2s`, `duration=800ms`; a bare number is seconds
+                        "duration" | "dur" | "for" | "time" => {
+                            duration_ms = Some(parse_duration_ms(v).or_else(|| parse_duration_ms(&format!("{v}s"))).ok_or(())?);
+                        }
+                        _ => break,
+                    }
+                } else if let Some(ms) = parse_duration_ms(&next_low) {
+                    // `laugh 2s`
+                    duration_ms = Some(ms);
+                } else if matches!(next_low.as_str(), "short" | "brief" | "long" | "verylong") {
+                    length = parse_length(&next_low).ok_or(())?;
+                } else if matches!(next_low.as_str(), "faint" | "gentle" | "light" | "strong" | "big" | "huge") {
+                    intensity = parse_intensity(&next_low).ok_or(())?;
+                } else {
+                    break;
+                }
+                i += 1;
+            }
+            actions.push(ImmediateAction::Vocal { sound, intensity, length, duration_ms });
             i += 1;
             continue;
         }
@@ -641,7 +778,24 @@ fn try_parse_bracket_tag(
                     return Err(());
                 }
             }
-            _ => return Err(()),
+            "laughter" | "laughing" | "laugh_while_speaking" | "laughwhilespeaking" => {
+                test_cfg.laughter = match v.to_ascii_lowercase().as_str() {
+                    "off" | "no" | "false" | "none" => 0.0,
+                    "on" | "yes" | "true" => 0.6,
+                    other => parse_intensity(other).ok_or(())?,
+                };
+            }
+            _ => {
+                // `laugh=0.8` (how strongly), `laugh=long`, or `laugh=2s` (for how long)
+                let sound = vocal::find(raw_k).ok_or(())?;
+                let (intensity, length, duration_ms) = match (parse_duration_ms(v), parse_intensity(v), parse_length(v)) {
+                    (Some(ms), _, _) => (VOCAL_INTENSITY, 1.0, Some(ms)),
+                    (None, Some(x), _) => (x, 1.0, None),
+                    (None, None, Some(x)) => (VOCAL_INTENSITY, x, None),
+                    (None, None, None) => return Err(()),
+                };
+                actions.push(ImmediateAction::Vocal { sound, intensity, length, duration_ms });
+            }
         }
         i += 1;
     }
@@ -767,6 +921,16 @@ pub fn parse_script_with_voices(
                                     config: Box::new(cur_cfg.clone()),
                                 });
                             }
+                            ImmediateAction::Vocal { sound, intensity, length, duration_ms } => {
+                                cues.push(ScriptCue::Vocal {
+                                    sound,
+                                    intensity,
+                                    length,
+                                    duration_ms,
+                                    config: Box::new(cur_cfg.clone()),
+                                    voice_label: cur_label.clone(),
+                                });
+                            }
                             ImmediateAction::StartSing { bpm } => {
                                 in_sing_mode = Some(bpm);
                             }
@@ -824,6 +988,9 @@ fn render_inhale_cue(duration_ms: f64, intensity: f64, cfg: &VoiceConfig) -> (Ve
             fric_g1: 0.0,
             fric_g2: 0.0,
             fric_hp: 0.0,
+            fric_lp: 0.0,
+            tone_hz: 1500.0,
+            tone: 0.0,
             is_closure: false,
             is_burst: false,
             stress: 0,
@@ -878,6 +1045,9 @@ fn silent_frames(duration_ms: f64, ref_cfg: &VoiceConfig) -> (Vec<f32>, Vec<Fram
             fric_g1: 0.0,
             fric_g2: 0.0,
             fric_hp: 0.0,
+            fric_lp: 0.0,
+            tone_hz: 1500.0,
+            tone: 0.0,
             is_closure: true,
             is_burst: false,
             stress: 0,
@@ -925,6 +1095,8 @@ pub fn synthesize_cues(
 
     let mut prev_voice_sig: Option<(Gender, i32, String)> = None;
     let mut prev_was_pause = false;
+    // how many sounds that are not words came before: no two laughs of a script are the same
+    let mut vocal_takes = 0u32;
 
     for cue in cues {
         let start_sec = all_samples.len() as f64 / SAMPLE_RATE as f64;
@@ -1031,6 +1203,80 @@ pub fn synthesize_cues(
                     pitch_hz: cfg.pitch_hz,
                     tract_length_cm: cfg.tract_length_cm,
                     singing: false,
+                    sound: None,
+                });
+            }
+            ScriptCue::Vocal {
+                sound,
+                intensity,
+                length,
+                duration_ms,
+                config,
+                voice_label,
+            } => {
+                let mut cfg = (**config).clone();
+                cfg.sanitize();
+                let sig = (
+                    cfg.gender,
+                    (cfg.tract_length_cm * 20.0).round() as i32,
+                    voice_label.clone(),
+                );
+                // the same beat between two speakers as before a line of speech
+                if let Some(psig) = &prev_voice_sig {
+                    if *psig != sig && !prev_was_pause && !all_samples.is_empty() {
+                        let (gap_pcm, mut gap_frs) = silent_frames(135.0, &cfg);
+                        let g_start = all_samples.len() as f64 / SAMPLE_RATE as f64;
+                        for f in &mut gap_frs {
+                            f.t_sec += g_start;
+                        }
+                        all_samples.extend_from_slice(&gap_pcm);
+                        all_frames.extend(gap_frs);
+                    }
+                }
+                prev_voice_sig = Some(sig);
+                prev_was_pause = false;
+
+                let seg_start = all_samples.len() as f64 / SAMPLE_RATE as f64;
+                let (frs_in, voice) = match duration_ms {
+                    Some(ms) => vocal::perform_for(sound, &cfg, *intensity, *ms / 1000.0, vocal_takes),
+                    None => vocal::perform(sound, &cfg, *intensity, *length, vocal_takes),
+                };
+                vocal_takes += 1;
+                if frs_in.is_empty() {
+                    continue;
+                }
+                let mut renderer = Renderer::new(frs_in, &voice);
+                let n_f = renderer.frames().len();
+                let mut pcm = vec![0.0f32; n_f * SAMPLES_PER_FRAME];
+                renderer.render(n_f, &mut pcm);
+                if (cfg.volume - 1.0).abs() > 1e-6 {
+                    let v = cfg.volume as f32;
+                    for s in &mut pcm {
+                        *s *= v;
+                    }
+                }
+                smooth_edges(&mut pcm);
+                let mut frs = renderer.into_frames();
+                for f in &mut frs {
+                    f.t_sec += seg_start;
+                    f.word = word_offset;
+                }
+                all_samples.extend_from_slice(&pcm);
+                all_frames.extend(frs);
+                let seg_end = all_samples.len() as f64 / SAMPLE_RATE as f64;
+                // it takes its place among the words, in brackets
+                let tag = format!("[{}]", sound.id);
+                all_words.push(WordTiming { word: tag.clone(), start: seg_start, end: seg_end });
+                text_parts.push(tag);
+                segments.push(SegmentSpan {
+                    start: seg_start,
+                    end: seg_end,
+                    voice: voice_label.clone(),
+                    gender: cfg.gender,
+                    pitch_hz: cfg.pitch_hz,
+                    tract_length_cm: cfg.tract_length_cm,
+                    singing: false,
+                    sound: Some(sound.id),
                 });
             }
             ScriptCue::Sing {
@@ -1087,6 +1333,7 @@ pub fn synthesize_cues(
                     pitch_hz: used_cfg.pitch_hz,
                     tract_length_cm: used_cfg.tract_length_cm,
                     singing: true,
+                    sound: None,
                 });
             }
         }

@@ -665,7 +665,7 @@ fn meta_json_string() -> String {
 
     let styles = [
         "excited", "happy", "calm", "sad", "serious", "dramatic",
-        "urgent", "fast", "slow", "louder", "softer", "whisper",
+        "urgent", "fast", "slow", "louder", "softer", "whisper", "laughing", "chuckling", "giggling",
     ];
     out.push_str(",\"styleNames\":[");
     for (i, s) in styles.iter().enumerate() {
@@ -673,6 +673,27 @@ fn meta_json_string() -> String {
             out.push(',');
         }
         push_json_str(&mut out, s);
+    }
+    out.push(']');
+
+    out.push_str(",\"sounds\":[");
+    let mut first = true;
+    for group in crate::vocal::GROUPS {
+        for snd in crate::vocal::VOCAL_SOUNDS.iter().filter(|s| s.group == group) {
+            if !first {
+                out.push(',');
+            }
+            first = false;
+            out.push_str("{\"id\":");
+            push_json_str(&mut out, snd.id);
+            out.push_str(",\"label\":");
+            push_json_str(&mut out, snd.label);
+            out.push_str(",\"group\":");
+            push_json_str(&mut out, snd.group);
+            out.push_str(",\"about\":");
+            push_json_str(&mut out, snd.about);
+            out.push('}');
+        }
     }
     out.push(']');
 
@@ -774,6 +795,10 @@ fn speech_meta_json(speech: &crate::Speech, segments: Option<&[SegmentSpan]>) ->
             push_json_num(&mut out, s.tract_length_cm);
             out.push_str(",\"singing\":");
             out.push_str(if s.singing { "true" } else { "false" });
+            if let Some(sound) = s.sound {
+                out.push_str(",\"sound\":");
+                push_json_str(&mut out, sound);
+            }
             out.push('}');
         }
         out.push(']');
@@ -897,9 +922,43 @@ pub(crate) fn parse_script_payload(
             &mut cur_cfg,
             item,
             &mut cur_label,
-            &["text", "pauseMs", "inhale", "sing", "bpm"],
+            &["text", "pauseMs", "inhale", "sing", "bpm", "sound", "intensity", "length", "durationMs"],
             custom_voices,
         )?;
+        // `{ sound: "laugh", intensity: 0.8, length: 1.5 }`: a sound that is not a word,
+        // before any text of the same cue
+        if let Some(sound_val) = item.get("sound") {
+            let name = sound_val
+                .as_str()
+                .ok_or_else(|| "sound must be the name of a vocal sound, e.g. \"laugh\"".to_string())?;
+            let sound = crate::vocal::find(name).ok_or_else(|| format!("unknown sound {name:?}"))?;
+            let intensity = match item.get("intensity") {
+                Some(v) => match v.as_str() {
+                    Some(word) => script::parse_intensity(word).ok_or_else(|| format!("unknown intensity {word:?}"))?,
+                    None => finite_val(v, "intensity")?.clamp(0.0, 1.0),
+                },
+                None => script::VOCAL_INTENSITY,
+            };
+            let length = match item.get("length") {
+                Some(v) => match v.as_str() {
+                    Some(word) => script::parse_length(word).ok_or_else(|| format!("unknown length {word:?}"))?,
+                    None => finite_val(v, "length")?.clamp(0.25, 4.0),
+                },
+                None => 1.0,
+            };
+            let duration_ms = match item.get("durationMs") {
+                Some(v) => Some(finite_val(v, "durationMs")?.clamp(50.0, 30_000.0)),
+                None => None,
+            };
+            cues.push(ScriptCue::Vocal {
+                sound,
+                intensity,
+                length,
+                duration_ms,
+                config: Box::new(cur_cfg.clone()),
+                voice_label: cur_label.clone(),
+            });
+        }
         if let Some(pause_val) = item.get("pauseMs") {
             cues.push(ScriptCue::Pause {
                 duration_ms: finite_val(pause_val, "pauseMs")?.clamp(10.0, 10_000.0),
@@ -1728,6 +1787,7 @@ mod ffi {
                     pitch_hz: cfg.pitch_hz,
                     tract_length_cm: cfg.tract_length_cm,
                     singing: true,
+                    sound: None,
                 };
                 (sung, span)
             };

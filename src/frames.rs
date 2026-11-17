@@ -48,6 +48,12 @@ pub struct Frame {
     pub fric_g2: f64,
     /// Low cut-off of the frication noise, Hz.
     pub fric_hp: f64,
+    /// High cut-off of the frication noise, Hz (0 = none).
+    pub fric_lp: f64,
+    /// A whistled tone: its pitch in Hz and its level (0 = none). Speech has none; see
+    /// `vocal`.
+    pub tone_hz: f64,
+    pub tone: f64,
     pub is_closure: bool,
     pub is_burst: bool,
     pub stress: u8,
@@ -279,7 +285,9 @@ fn shape_transitions(
 
 pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
     let female = cfg.gender == Gender::Female;
-    let h_noise = tune("h_noise", 1.0);
+    // (the female /h/ was too faint against her vowels: sentences full of "he", "her", "had"
+    // were the ones a listening model marked down most)
+    let h_noise = tune("h_noise", if female { 1.4 } else { 1.0 });
     // How breathy the very end of a phrase gets.
     let tail_lax = tune("tail_lax", 0.42);
     // Creak at the end of a phrase (development hooks: how strong, and from which point of
@@ -475,6 +483,9 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
                 fric_g1: s.fric_g1,
                 fric_g2: s.fric_g2,
                 fric_hp: s.fric_hp * (1.0 + (formant_scale - 1.0) * 0.60),
+                fric_lp: s.fric_lp * (1.0 + (formant_scale - 1.0) * 0.60),
+                tone_hz: 1500.0,
+                tone: 0.0,
                 is_closure: seg.is_closure,
                 is_burst: seg.shape == Shape::Burst,
                 stress: seg.stress,
@@ -612,15 +623,18 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
                 phrase_log -= t_excl_fall * t_fall * sf * sf * expressiveness;
             }
         } else if matches!(meta.punc, ',' | ';' | ':') {
-            // continuation: slight pre-boundary dip, then a gentle continuation rise at commas
+            // continuation: a gentle continuation rise at commas. (There was a dip before it:
+            // two readers keep the voice up until the last word before a comma - a semitone
+            // above their average where the dip put it one below.)
             if meta.punc == ',' {
-                if pos_b > 0.55 && pos_b <= 0.84 {
+                let comma_dip = tune("comma_dip", 0.0);
+                if comma_dip != 0.0 && pos_b > 0.55 && pos_b <= 0.84 {
                     let dip = ((pos_b - 0.55) / 0.29 * PI).sin();
-                    phrase_log -= 0.06 * dip * expressiveness;
+                    phrase_log -= comma_dip * dip * expressiveness;
                 }
                 if pos_b > 0.80 {
                     let cr = (pos_b - 0.80) / 0.20;
-                    phrase_log += 0.065 * cr * cr * expressiveness;
+                    phrase_log += tune("comma_rise", 0.065) * cr * cr * expressiveness;
                 }
             } else if pos_b > 0.72 {
                 let cr = (pos_b - 0.72) / 0.28;
@@ -801,6 +815,7 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
             c.fric_g1 = p.fric_g1;
             c.fric_g2 = p.fric_g2;
             c.fric_hp = p.fric_hp;
+            c.fric_lp = p.fric_lp;
         }
         // Bursts stay crisp at onset and decay smoothly into the following vowel.
         c.af = if c.is_burst {
@@ -903,5 +918,153 @@ pub fn rasterize(timeline: &Timeline, cfg: &VoiceConfig) -> Vec<Frame> {
         let _ = std::fs::write(path, text);
     }
 
+    if cfg.laughter > 0.01 && !whisper {
+        let sentence_end: Vec<bool> = clause_spans.iter().map(|c| matches!(c.meta.punc, '.' | '!' | '?')).collect();
+        frames = laugh_while_speaking(frames, &sentence_end, cfg);
+    }
+
     frames
+}
+
+
+/// Laughing while speaking (the `laughter` setting). People do not stop talking to laugh:
+/// the laugh comes through the words. What is known of such speech (Nwokah et al. 1999;
+/// Trouvain 2001; Menezes & Igarashi 2006):
+///
+/// - the lips are spread, which shortens the tube and lifts its upper resonances (a smile is
+///   audible), the voice sits higher and has more breath in it;
+/// - in some stressed vowels the laugh itself breaks through: the vowel is interrupted by a
+///   puff of breath and said again, higher, once or twice - "I can't belie-(h)ie-(h)ieve it";
+/// - and where a sentence ends, the laugh that was held in comes out.
+///
+/// The words stay words: everything a listener needs to recognise them is left where it was,
+/// and the calls are added between. (A first version shook the vowels with a tremor instead:
+/// a phoneme recogniser lost a third of the sounds, and a sound tagger heard no laughter.)
+fn laugh_while_speaking(mut frames: Vec<Frame>, sentence_end: &[bool], cfg: &VoiceConfig) -> Vec<Frame> {
+    let amount = clamp(cfg.laughter, 0.0, 1.0);
+    // the smile, the lift and the breath come first; the laugh itself with more of it
+    let depth = clamp((amount - 0.15) / 0.85, 0.0, 1.0);
+    let lift = 2f64.powf(tune("laugh_lift", 2.5) * amount / 12.0);
+    let smile = tune("laugh_smile", 1.0) * amount;
+    let breath = tune("laugh_breath", 0.05) * amount;
+    for f in frames.iter_mut() {
+        f.f0 = clamp(f.f0 * lift, 55.0, 520.0);
+        f.f1 *= 1.0 + 0.03 * smile;
+        f.f2 *= 1.0 + 0.06 * smile;
+        f.f3 *= 1.0 + 0.04 * smile;
+        f.lip_s = f.lip_s.max(0.55 * amount).min(1.0);
+        f.lip_r *= 1.0 - 0.5 * amount;
+        if f.av > 0.1 {
+            f.ah += breath * f.av;
+            f.lax = (f.lax + 0.15 * amount).min(0.85);
+        }
+    }
+    if depth <= 0.0 {
+        return frames;
+    }
+
+    let mut rng = 0x1a09_4e21u32 ^ cfg.seed.wrapping_mul(0x9e37_79b9) ^ (frames.len() as u32).wrapping_mul(0x85eb_ca6b);
+    let mut uniform = move || {
+        rng ^= rng << 13;
+        rng ^= rng >> 17;
+        rng ^= rng << 5;
+        rng as f64 / u32::MAX as f64
+    };
+    // (more than a third of the stressed vowels, and the words themselves are lost)
+    let in_word = tune("laugh_in_word", 0.3) * depth + 0.08;
+    let after_sentence = tune("laugh_after", 0.8) * depth + 0.2;
+    let jump = tune("laugh_jump", 4.0) * (0.6 + 0.4 * depth);
+    let gap_ms = tune("laugh_gap_ms", 70.0);
+    let call_ms = tune("laugh_call_ms", 75.0);
+
+    let n = frames.len();
+    let mut out: Vec<Frame> = Vec::with_capacity(n + n / 3);
+    let mut takes = 0u32;
+    let mut i = 0;
+    while i < n {
+        // a stressed vowel: the laugh may break into it
+        let stressed_vowel = |f: &Frame| f.phone.is_vowel() && f.stress == 1 && f.av > 0.45;
+        if stressed_vowel(&frames[i]) {
+            let start = i;
+            while i < n && frames[i].phone == frames[start].phone && frames[i].word == frames[start].word && frames[i].av > 0.3 {
+                i += 1;
+            }
+            let run = i - start;
+            if run >= 10 && uniform() < in_word {
+                // the vowel begins as itself, is cut off by a puff of breath, and said again
+                let cut = start + (run * 3 / 5).max(8);
+                out.extend_from_slice(&frames[start..cut]);
+                let base = frames[cut - 1].clone();
+                let calls = if uniform() < 0.5 * depth { 2 } else { 1 };
+                for c in 0..calls {
+                    let n_gap = (gap_ms / FRAME_MS).round() as usize;
+                    for k in 0..n_gap {
+                        let w = (PI * (k as f64 + 0.5) / n_gap as f64).sin();
+                        let mut f = base.clone();
+                        f.av = base.av * (1.0 - 0.93 * w);
+                        f.ah = base.ah + (0.22 + 0.25 * depth) * w;
+                        f.lax = (base.lax + 0.45 * w).min(0.9);
+                        f.b1 += 150.0 * w;
+                        f.jaw *= 1.0 - 0.25 * w;
+                        out.push(f);
+                    }
+                    let n_call = (call_ms / FRAME_MS).round() as usize;
+                    let up = jump * if c == 0 { 1.0 } else { 0.7 };
+                    for k in 0..n_call {
+                        let u = k as f64 / (n_call - 1).max(1) as f64;
+                        let mut f = base.clone();
+                        f.av = base.av * (0.95 - 0.2 * u);
+                        f.f0 = clamp(base.f0 * 2f64.powf((up - 3.0 * u) / 12.0), 55.0, 520.0);
+                        f.lax = (base.lax + 0.1).min(0.9);
+                        f.jaw = (base.jaw * 1.1).min(1.0);
+                        out.push(f);
+                    }
+                }
+                out.extend_from_slice(&frames[cut..i]);
+            } else {
+                out.extend_from_slice(&frames[start..i]);
+            }
+            continue;
+        }
+        out.push(frames[i].clone());
+        // where a sentence ends (or the utterance), the laugh that was held in comes out
+        let clause = frames[i].clause_idx;
+        let ends_clause = clause >= 0 && (i + 1 == n || frames[i + 1].clause_idx != clause);
+        // (at the very end it always does, once the speaker is laughing at all)
+        let last_word = i + 1 == n || frames[i + 1..].iter().all(|f| f.clause_idx < 0);
+        if ends_clause
+            && sentence_end.get(clause as usize).copied().unwrap_or(false)
+            && (uniform() < after_sentence || (last_word && depth > 0.3))
+        {
+            let name = if amount < 0.45 { "chuckle" } else { "laugh" };
+            if let Some(sound) = crate::vocal::find(name) {
+                let length = 0.5 + 0.5 * depth * (0.6 + 0.4 * uniform());
+                let (mut laugh, _) = crate::vocal::perform(sound, cfg, 0.3 + 0.45 * depth, length, takes);
+                takes += 1;
+                // a moment for the last sound to finish
+                let pause = frames[i].clone();
+                for _ in 0..8 {
+                    let mut f = pause.clone();
+                    f.av = 0.0;
+                    f.ah = 0.0;
+                    f.af = 0.0;
+                    f.avb = 0.0;
+                    f.clause_idx = -1;
+                    f.word = -1;
+                    f.phone = crate::phone::Ph::SIL;
+                    out.push(f);
+                }
+                for f in laugh.iter_mut() {
+                    f.clause_idx = -1;
+                    f.word = -1;
+                }
+                out.append(&mut laugh);
+            }
+        }
+        i += 1;
+    }
+    for (k, f) in out.iter_mut().enumerate() {
+        f.t_sec = k as f64 * FRAME_SEC;
+    }
+    out
 }

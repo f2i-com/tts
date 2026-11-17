@@ -8,6 +8,7 @@
 //!
 //! `--dict cmudict.dict` loads a full pronouncing dictionary first.
 //! `--timing` prints `token phone start_ms end_ms` for every phone of the utterance.
+//! `--frames` prints the control values of every 5 ms frame (what the renderer is told to do).
 //! `--levels` (batch mode) prints the average level of every phone relative to the vowels.
 //! In batch mode one line with the ARPAbet transcription is printed per job; an output
 //! path of `-` skips synthesis (transcription only).
@@ -44,6 +45,7 @@ fn main() {
     let mut batch: Option<String> = None;
     let mut levels = false;
     let mut timing = false;
+    let mut dump_frames = false;
     let mut overrides: Vec<(String, f64)> = Vec::new();
     let mut tone: Option<Vec<f64>> = None;
     let mut seed: Option<u32> = None;
@@ -87,6 +89,7 @@ fn main() {
             "--phones" => phones_only = true,
             "--levels" => levels = true,
             "--timing" => timing = true,
+            "--frames" => dump_frames = true,
             // Use only the hand-tuned core lexicon + rules.
             "--core-lexicon" => core_only = true,
             "--dict" => dict = Some(args.next().expect("--dict <file>")),
@@ -276,6 +279,35 @@ fn main() {
     let elapsed = t0.elapsed().as_secs_f64();
     println!("text: {}", speech.text);
     println!("ipa:  {}", speech.ipa);
+    if dump_frames {
+        println!("frame  ms phone  f0    f1   f2   f3   b1  av    ah    af    avb   nasal lax  creak fricf1 g1   g2   hp   flags level");
+        for (i, f) in speech.frames.iter().enumerate() {
+            println!(
+                "{i:5} {:4} {:5} {:5.1} {:4.0} {:4.0} {:4.0} {:4.0} {:.3} {:.3} {:.3} {:.3} {:.2}  {:.2} {:.2}  {:5.0} {:.2} {:.2} {:4.0} {}{} {:.3}",
+                i * 5,
+                f.phone.name(),
+                f.f0,
+                f.f1,
+                f.f2,
+                f.f3,
+                f.b1,
+                f.av,
+                f.ah,
+                f.af,
+                f.avb,
+                f.nasal,
+                f.lax,
+                f.creak,
+                f.fric_f1,
+                f.fric_g1,
+                f.fric_g2,
+                f.fric_hp,
+                if f.is_closure { 'c' } else { '-' },
+                if f.is_burst { 'b' } else { '-' },
+                f.rms,
+            );
+        }
+    }
     println!(
         "{:.2} s of audio rendered in {:.1} ms ({:.0}x real time)",
         speech.duration(),

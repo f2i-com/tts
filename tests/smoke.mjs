@@ -318,6 +318,75 @@ const womanArc = maleBase.speakScript(
 assert.equal(womanArc.segments.length, 4);
 assert.ok(womanArc.segments.every((s) => s.gender === "female" && s.voice === "woman_a"));
 assert.equal(womanArc.segments[3].pitchHz, 186);
+
+// --- Sounds that are not words: laughter, sighs, coughs, "mm-hm", whistles ---------------
+const sounds = TTS.sounds();
+assert.ok(sounds.length >= 50, `${sounds.length} sounds`);
+assert.deepEqual(TTS.soundNames(), sounds.map((x) => x.id));
+for (const id of ["laugh", "giggle", "chuckle", "sigh", "gasp", "cough", "hmm", "uh-huh", "shh", "whistle"]) {
+  assert.ok(sounds.some((x) => x.id === id), `sound ${id}`);
+}
+assert.ok(sounds.every((x) => x.label && x.about && ["laughter", "breath", "reaction", "voice", "mouth", "body"].includes(x.group)));
+
+const laugh = maleBase.sound("laugh");
+assert.ok(laugh.duration > 0.8 && laugh.duration < 3 && peak(laugh.samples) > 0.5);
+assert.deepEqual(laugh.words.map((x) => x.word), ["[laugh]"]);
+assert.equal(laugh.segments[0].sound, "laugh");
+assert.ok(maleBase.sound("laugh", { length: 2 }).duration > laugh.duration * 1.4);
+assert.ok(maleBase.sound("laugh", { length: "long", intensity: "strong" }).duration > laugh.duration * 1.2);
+assert.equal(String.fromCharCode(...maleBase.soundWav("sigh").slice(0, 4)), "RIFF");
+assert.throws(() => maleBase.sound("no such sound"), /unknown sound/);
+assert.throws(() => maleBase.sound("laugh", { intensity: NaN }), /intensity/);
+// every one of them renders, in both voices
+for (const voice of [maleBase, female]) {
+  for (const snd of sounds) {
+    const out = voice.sound(snd.id);
+    assert.ok(out.duration > 0.15 && out.duration < 6, `${snd.id}: ${out.duration} s`);
+    assert.ok(out.samples.every((v) => Number.isFinite(v) && Math.abs(v) <= 1), snd.id);
+    assert.ok(peak(out.samples) > 0.02, `${snd.id} is silent`);
+  }
+}
+// in a script they are tags, made by whoever is speaking, and take their place among the words
+const funny = maleBase.speakScript("[female] That is ridiculous! [giggle] [deep] Hmm. [sigh] Quite. [laugh=strong]");
+assert.deepEqual(funny.words.map((x) => x.word), ["that", "is", "ridiculous", "[giggle]", "hmm", "[sigh]", "quite", "[laugh]"]);
+assert.deepEqual(funny.segments.map((x) => x.sound ?? null), [null, "giggle", null, "sigh", null, "laugh"]);
+assert.equal(funny.segments[1].gender, "female");
+assert.equal(funny.segments[3].voice, "deep");
+// ... or cues from an agent
+const cueSounds = maleBase.speakScript([
+  { voice: "female", text: "Oh no." },
+  { sound: "gasp" },
+  { voice: "deep", sound: "chuckle", intensity: 0.8, text: "Never mind." },
+]);
+assert.deepEqual(cueSounds.segments.map((x) => x.sound ?? null), [null, "gasp", "chuckle", null]);
+assert.equal(cueSounds.segments[2].gender, "male");
+// a duration instead of a length: as a tag, a cue, or an option
+const near = (a, b, tol = 0.12) => Math.abs(a - b) < tol;
+assert.ok(near(maleBase.speakScript("[laugh=3s]").duration, 3), "laugh for 3 s");
+assert.ok(near(maleBase.speakScript("[sigh duration=2s]").duration, 2));
+assert.ok(near(maleBase.sound("giggle", { durationMs: 2500 }).duration, 2.5));
+assert.ok(near(maleBase.speakScript([{ sound: "shh", durationMs: 1800 }]).duration, 1.8));
+assert.ok(maleBase.sound("hiccup", { durationMs: 3000 }).duration < 0.8, "a hiccup stays a hiccup");
+assert.throws(() => maleBase.sound("laugh", { durationMs: "long" }), /durationMs/);
+
+// Laughing while speaking: a setting of the voice, and a delivery in a script
+assert.equal(maleBase.settings.laughter, 0);
+assert.ok(TTS.styleNames().includes("laughing"));
+const joke = "I can't believe you actually did that! That is the funniest thing I have heard all week.";
+const straight = new TTS({ gender: "female", variation: 0 });
+const amused = new TTS({ gender: "female", variation: 0, laughter: 0.7 });
+assert.equal(amused.settings.laughter, 0.7);
+const told = straight.speak(joke);
+const laughed = amused.speak(joke);
+assert.deepEqual(laughed.words.map((x) => x.word), told.words.map((x) => x.word));
+assert.ok(laughed.duration > told.duration + 0.4, `${laughed.duration} vs ${told.duration}`);
+assert.ok(medianPitch(laughed) > medianPitch(told) * 1.03, `${medianPitch(laughed)} vs ${medianPitch(told)}`);
+const scene = straight.speakScript("[laughing] You should have seen his face! [/laughing] Anyway.");
+assert.equal(scene.segments.length, 2);
+assert.ok(scene.words.every((x) => !x.word.startsWith("[")));
+assert.throws(() => new TTS({ laughter: "lots" }), /laughter/);
+straight.free();
+amused.free();
 maleBase.free();
 
 console.log(`ok: self-contained tts.wasm works (male ${pm.toFixed(0)} Hz, female ${pf.toFixed(0)} Hz, ${m.duration.toFixed(1)} s speech, dialogue ${dialogue.duration.toFixed(1)} s, choir ${choir.duration.toFixed(1)} s)`);

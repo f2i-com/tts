@@ -4,13 +4,31 @@ use crate::lexicon::Lexicon;
 use crate::phone::{Ph, Phone};
 use crate::text::normalize;
 
+/// How much weight a word carries in its phrase. People do not give every word the same
+/// attention: the words that carry the meaning are said in full and marked with the voice,
+/// the grammar between them is hurried through.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Weight {
+    /// Nouns, verbs, adjectives, adverbs: the full form, and a pitch accent on the stressed
+    /// syllable.
+    Content,
+    /// Closed-class words that keep their full form and word stress but carry no accent of
+    /// their own: longer prepositions, conjunctions, relative words ("about", "because",
+    /// "which"), and a pronoun at the very end of a phrase ("I saw *him*.").
+    Light,
+    /// The little words that are rushed and reduced: articles, short prepositions,
+    /// pronouns, auxiliaries ("the", "of", "he", "would").
+    Weak,
+}
+
 #[derive(Clone, Debug)]
 pub struct PlanWord {
     pub text: String,
     pub phones: Vec<Phone>,
     pub ipa: String,
-    /// Content words carry pitch accents; non-final function words are destressed.
+    /// False for the [`Weight::Weak`] words, which are destressed and timed as function words.
     pub is_content: bool,
+    pub weight: Weight,
     pub is_clause_final: bool,
 }
 
@@ -57,11 +75,73 @@ impl Plan {
     }
 }
 
-const FUNCTION_WORDS: [&str; 35] = [
+/// The weak words: articles, short prepositions and conjunctions, forms of "be", personal
+/// pronouns, auxiliaries and modals, and the contractions made of them. Measured on two
+/// readers (tools/fit_durations.py), the vowels of the pronouns and auxiliaries are as short
+/// as those of "the" and "of" - 0.71 of a content word's - and none of them is normally
+/// accented: "*he* would *have* gone" with a pitch movement on every word is what a machine
+/// reading a word list sounds like. (Negatives - "not", "don't", "can't" - are not weak.)
+const FUNCTION_WORDS: [&str; 89] = [
     "a", "an", "the", "to", "of", "in", "on", "at", "for", "by", "with", "and", "or", "but", "if",
     "as", "is", "am", "are", "was", "were", "be", "it", "its", "my", "your", "his", "her", "our",
     "their", "that", "from", "than", "them", "can",
+    // personal pronouns
+    "i", "he", "she", "we", "you", "they", "me", "him", "us",
+    // auxiliaries and modals
+    "have", "has", "had", "do", "does", "did", "will", "would", "could", "should", "shall", "may",
+    "might", "must", "been", "being",
+    // contractions of a pronoun and an auxiliary
+    "i'm", "i'll", "i've", "i'd", "you're", "you'll", "you've", "you'd", "he's", "he'll", "he'd",
+    "she's", "she'll", "she'd", "we're", "we'll", "we've", "we'd", "they're", "they'll",
+    "they've", "they'd", "it's", "it'll", "that's", "there's", "who's", "what's", "here's",
 ];
+
+/// Words said in full but without a pitch accent of their own ([`Weight::Light`]): the longer
+/// prepositions, the conjunctions that open a clause, and reflexive pronouns. (As adverbs -
+/// "come over", "look around" - they mostly stand before a pause, where every word counts
+/// as content.)
+const LIGHT_WORDS: [&str; 44] = [
+    "about", "above", "across", "after", "against", "along", "among", "around", "before", "behind",
+    "below", "beneath", "beside", "between", "beyond", "during", "into", "onto", "over", "through",
+    "toward", "towards", "under", "until", "upon", "within", "without", "because", "although",
+    "though", "while", "whether", "unless", "since", "myself", "yourself", "himself", "herself",
+    "itself", "ourselves", "themselves", "whom", "whose", "nor",
+];
+
+/// Personal pronouns: at the very end of a phrase they keep their full form but do not take
+/// the phrase's main accent ("I *saw* him.", "*Look* at it.").
+const PRONOUNS: [&str; 13] = ["i", "he", "she", "we", "you", "they", "me", "him", "her", "us", "them", "it", "one"];
+
+/// After "there", these make it the empty subject of "there is" rather than a place.
+const BE_AND_MODALS: [&str; 16] = [
+    "is", "are", "was", "were", "will", "would", "has", "have", "had", "must", "can", "could", "should", "may",
+    "might", "seems",
+];
+
+/// The weight of the word `w` at position `wi` of a clause of `count` words (see [`Weight`]).
+fn word_weight(w: &str, wi: usize, count: usize, next: Option<&str>, is_question: bool, has_earlier_content: bool) -> Weight {
+    let is_final = wi + 1 == count;
+    if is_final {
+        // Before a pause every word is said in full; a pronoun there still leaves the main
+        // accent to the last word that means something.
+        return if has_earlier_content && PRONOUNS.contains(&w) && w != "one" { Weight::Light } else { Weight::Content };
+    }
+    if FUNCTION_WORDS.contains(&w) {
+        return Weight::Weak;
+    }
+    if LIGHT_WORDS.contains(&w) {
+        return Weight::Light;
+    }
+    // "who", "what", "when" ... open a question with an accent ("*Where* did you go?"), and
+    // join clauses without one ("the day when it rained").
+    if is_wh_word(w) && !(is_question && wi < 2) {
+        return Weight::Light;
+    }
+    if w == "there" && next.is_some_and(|n| BE_AND_MODALS.contains(&n)) {
+        return Weight::Light;
+    }
+    Weight::Content
+}
 
 /// Weak forms: in running speech these little words are not pronounced the way a dictionary
 /// lists them - their vowel shrinks to a schwa ("and" -> "'nd", "for" -> "fer", "can" -> "c'n").
@@ -408,7 +488,10 @@ pub fn build_plan(raw_text: &str, lex: &Lexicon) -> Plan {
                 }
             }
 
-            let is_func = is_non_final && FUNCTION_WORDS.contains(&w);
+            let next_word = (wi + 1 < count).then(|| expanded[wi + 1].0.as_str());
+            let has_earlier_content = words.iter().any(|x: &PlanWord| x.weight == Weight::Content);
+            let weight = word_weight(w, wi, count, next_word, punc == '?', has_earlier_content);
+            let is_func = weight == Weight::Weak;
             if is_func {
                 for p in phones.iter_mut() {
                     if p.stress == 1 {
@@ -424,6 +507,7 @@ pub fn build_plan(raw_text: &str, lex: &Lexicon) -> Plan {
                 phones,
                 ipa,
                 is_content: !is_func,
+                weight,
                 is_clause_final: wi == count - 1,
             });
         }
@@ -457,7 +541,7 @@ mod tests {
     #[test]
     fn words_that_depend_on_their_role() {
         assert_eq!(arpabet("to record a record"), "T AX0 | R IH0 K AO1 R D | AX0 | R EH1 K ER0 D");
-        assert_eq!(arpabet("they present the present"), "DH EY1 | P R IY0 Z EH1 N T | DH AX0 | P R EH1 Z AX0 N T");
+        assert_eq!(arpabet("they present the present"), "DH EY0 | P R IY0 Z EH1 N T | DH AX0 | P R EH1 Z AX0 N T");
         assert!(arpabet("I have read it").contains("R EH1 D"));
         assert!(arpabet("I will read it").contains("R IY1 D"));
         assert!(arpabet("we used to go").contains("Y UW1 S T"));
@@ -499,6 +583,38 @@ mod tests {
         assert_eq!(arpabet("the dog"), "DH AX0 | D AO1 G");
         // clause-final function words keep their stress
         assert_eq!(arpabet("what is it"), "W AA1 T | IH0 Z | IH1 T");
+    }
+
+    #[test]
+    fn little_words_carry_little_weight() {
+        let lex = Lexicon::new();
+        let weights = |text: &str| -> Vec<(String, Weight)> {
+            build_plan(text, &lex).clauses.iter().flat_map(|c| c.words.iter()).map(|w| (w.text.clone(), w.weight)).collect()
+        };
+        let of = |text: &str, word: &str| weights(text).into_iter().find(|(w, _)| w == word).unwrap().1;
+        // pronouns, auxiliaries and their contractions are rushed like "the" and "of"
+        for word in ["he", "would", "have", "the"] {
+            assert_eq!(of("He would have seen the dog.", word), Weight::Weak, "{word}");
+        }
+        assert_eq!(of("I'll go there.", "i'll"), Weight::Weak);
+        assert_eq!(arpabet("he would go"), "HH IY0 | W UH0 D | G OW1");
+        // ... but not negatives, and not the words that carry the meaning
+        assert_eq!(of("He would not have seen the dog.", "not"), Weight::Content);
+        assert_eq!(of("He would have seen the dog.", "seen"), Weight::Content);
+        // longer prepositions and conjunctions keep their stress and lose their accent
+        assert_eq!(of("We walked about the town because it rained.", "about"), Weight::Light);
+        assert_eq!(of("We walked about the town because it rained.", "because"), Weight::Light);
+        assert!(arpabet("about the town").starts_with("AX0 B AW1 T"));
+        // a question word opens a question with an accent and joins clauses without one
+        assert_eq!(of("Where did you go?", "where"), Weight::Content);
+        assert_eq!(of("This is the town where it rained.", "where"), Weight::Light);
+        assert_eq!(of("There is a dog over there.", "there"), Weight::Light);
+        // before a pause every word is said in full, but a pronoun leaves the accent to the verb
+        assert_eq!(of("I saw him.", "him"), Weight::Light);
+        assert_eq!(arpabet("I saw him"), "AY0 | S AO1 | HH IH1 M");
+        assert_eq!(of("What is it for?", "for"), Weight::Content);
+        assert_eq!(of("Yes, I can.", "can"), Weight::Content);
+        assert_eq!(of("It is.", "is"), Weight::Content);
     }
 
     #[test]

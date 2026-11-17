@@ -1226,6 +1226,7 @@ fn append_consonant_segs(
         sb.fric_g1 = g1;
         sb.fric_g2 = g2;
         sb.fric_hp = hp;
+        sb.fric_lp = crate::timeline::burst_ceiling(st.place, st.b_f1);
         sb.lip_c = st.lip_c * 0.2;
         segments.push(SingSeg {
             s: sb,
@@ -1761,6 +1762,9 @@ fn rasterize_singing_frames(
                 fric_g1: s.fric_g1,
                 fric_g2: s.fric_g2,
                 fric_hp: s.fric_hp * (1.0 + (formant_scale - 1.0) * 0.60),
+                fric_lp: s.fric_lp * (1.0 + (formant_scale - 1.0) * 0.60),
+                tone_hz: 1500.0,
+                tone: 0.0,
                 is_closure: seg.is_closure,
                 is_burst: seg.is_burst,
                 stress: 1,
@@ -2006,6 +2010,7 @@ pub fn synthesize_chorus(
         pitch_hz: lead_cfg.pitch_hz,
         tract_length_cm: lead_cfg.tract_length_cm,
         singing: true,
+        sound: None,
     };
 
     (lead, vec![span])

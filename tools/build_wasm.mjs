@@ -143,6 +143,8 @@ export class TTS {
   static toneBandsHz() { return requireBound().TTS.toneBandsHz(); }
   static voiceIds() { return requireBound().TTS.voiceIds(); }
   static styleNames() { return requireBound().TTS.styleNames(); }
+  static sounds() { return requireBound().TTS.sounds(); }
+  static soundNames() { return requireBound().TTS.soundNames(); }
   static noteToHz(note) { return requireBound().TTS.noteToHz(note); }
   static randomVoice(options) { return requireBound().TTS.randomVoice(options); }
 
@@ -159,6 +161,8 @@ export class TTS {
   speakWav(text) { return this.#inner.speakWav(text); }
   speakScript(script) { return this.#inner.speakScript(script); }
   speakScriptWav(script) { return this.#inner.speakScriptWav(script); }
+  sound(name, options) { return this.#inner.sound(name, options); }
+  soundWav(name, options) { return this.#inner.soundWav(name, options); }
   sing(score, lyrics, bpm) { return this.#inner.sing(score, lyrics, bpm); }
   singWav(score, lyrics, bpm) { return this.#inner.singWav(score, lyrics, bpm); }
   singChorus(chorus) { return this.#inner.singChorus(chorus); }
@@ -166,6 +170,7 @@ export class TTS {
 
   play(text, audioContext) { return this.#inner.play(text, audioContext); }
   playScript(script, audioContext) { return this.#inner.playScript(script, audioContext); }
+  playSound(name, options, audioContext) { return this.#inner.playSound(name, options, audioContext); }
   playSong(score, lyrics, bpm, audioContext) { return this.#inner.playSong(score, lyrics, bpm, audioContext); }
   playChorus(chorus, audioContext) { return this.#inner.playChorus(chorus, audioContext); }
 
@@ -217,6 +222,8 @@ export interface VoiceOptions {
   subglottal?: number;
   room?: number;
   pitchCoupling?: number;
+  /** 0..1: how much the speaker is laughing while speaking (a smile in the voice, then the laugh breaking into the stressed vowels). */
+  laughter?: number;
   air?: number;
   closure?: number;
 }
@@ -254,14 +261,36 @@ export interface SegmentTiming {
   pitchHz: number;
   tractLengthCm: number;
   singing: boolean;
+  /** For a sound that is not a word (a laugh, a sigh ...), its id; absent for speech and song. */
+  sound?: string;
 }
 
-export interface ScriptCueInput extends VoiceOptions {
+/** A sound a voice makes that is not a word: a laugh, a sigh, a cough, "mm-hm", a whistle ... */
+export interface VocalSound {
+  /** The script tag (\`[laugh]\`) and the name for \`voice.sound()\`. */
+  id: string;
+  label: string;
+  group: "laughter" | "breath" | "reaction" | "voice" | "mouth" | "body";
+  about: string;
+}
+
+export interface SoundOptions {
+  /** How strongly: 0..1 (0.6 is the usual), or "faint" | "gentle" | "medium" | "strong" | "max". */
+  intensity?: number | string;
+  /** How long against the usual length (1): a factor 0.25..4, or "short" | "long" | "verylong". */
+  length?: number | string;
+  /** Or how long in milliseconds, as nearly as the sound allows (a hiccup stays a hiccup). */
+  durationMs?: number;
+}
+
+export interface ScriptCueInput extends VoiceOptions, SoundOptions {
   voice?: string;
   style?: string;
   text?: string;
   pauseMs?: number;
   inhale?: number | boolean;
+  /** A vocal sound made before any \`text\` of the same cue: "laugh", "sigh", "cough" ... */
+  sound?: string;
   sing?: string;
   bpm?: number;
 }
@@ -342,6 +371,9 @@ export class TTS {
   static toneBandsHz(): Float64Array;
   static voiceIds(): string[];
   static styleNames(): string[];
+  /** The sounds that are not words, grouped: each \`id\` is a script tag and a name for \`sound()\`. */
+  static sounds(): VocalSound[];
+  static soundNames(): string[];
   static noteToHz(note: string): number;
   static randomVoice(options?: VoiceOptions | Gender | string): VoiceSettings;
 
@@ -358,6 +390,9 @@ export class TTS {
   speakWav(text: string): Uint8Array;
   speakScript(script: string | ScriptCueInput[]): Speech;
   speakScriptWav(script: string | ScriptCueInput[]): Uint8Array;
+  /** A sound that is not a word, in this voice: \`voice.sound("laugh")\`, \`voice.sound("sigh", { intensity: 0.9 })\`. */
+  sound(name: string, options?: SoundOptions): Speech;
+  soundWav(name: string, options?: SoundOptions): Uint8Array;
   sing(score: string | SingOptions, lyrics?: string, bpm?: number): Speech;
   singWav(score: string | SingOptions, lyrics?: string, bpm?: number): Uint8Array;
   singChorus(chorus: string | ChorusOptions | ChorusPartInput[]): Speech;
@@ -365,6 +400,7 @@ export class TTS {
 
   play(text: string, audioContext?: AudioContext): Promise<PlaybackHandle>;
   playScript(script: string | ScriptCueInput[], audioContext?: AudioContext): Promise<PlaybackHandle>;
+  playSound(name: string, options?: SoundOptions, audioContext?: AudioContext): Promise<PlaybackHandle>;
   playSong(score: string | SingOptions, lyrics?: string, bpm?: number, audioContext?: AudioContext): Promise<PlaybackHandle>;
   playChorus(chorus: string | ChorusOptions | ChorusPartInput[], audioContext?: AudioContext): Promise<PlaybackHandle>;
 
@@ -390,7 +426,9 @@ fs.writeFileSync(
   JSON.stringify(
     {
       name: "tts",
-      version: "1.0.0",
+      // (one version for the crate, the repository and the package: the root package.json)
+      version: JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version,
+      license: "Apache-2.0",
       type: "module",
       description: "TTS (tts.computer): self-contained physical vocal-tract speech & singing synthesizer in WebAssembly.",
       homepage: "https://tts.computer",
