@@ -6,11 +6,23 @@ English text, multi-voice dialogue scripts, or musical notes & lyrics go in — 
 
 - **Single-file self-contained `tts.wasm`** (~1.9 MB raw, ~620 KB gzipped) — **0 external WASM imports**, with the complete JavaScript `TTS` SDK baked directly inside `tts.wasm` itself (grab it from [GitHub Releases](https://github.com/f2i-com/tts/releases))
 - **~400–500× faster than real time** in the browser; outputs 24 kHz mono PCM or ready-to-save 16-bit WAV
-- **Natural speech realism** (8% male / 8% female held-out phoneme error rate — matching human recordings — and 3.61 / 3.63 UTMOS naturalness)
+- **Natural speech realism** (7% male / 7% female held-out phoneme error rate — below that of human recordings — and 3.78 / 3.78 UTMOS naturalness)
 - **Dynamic voice creation & reuse** (`TTS.randomVoice()`, `voice.randomize()`, `voice.registerVoice()`) — lock any parameters, randomize the rest within human anatomy, and reuse the voice across dialogue and song
 - **Multi-voice scripted dialogue & singing** (`voice.speakScript()`, `voice.sing()`, `voice.singChorus()`) — inline speed, pitch, emotion styles, whispers, breaths, solo melodies, and 4-part harmonies
 - **53 vocal sounds, ten of them kinds of laughter** (`[laugh]`, `[giggle]`, `[sigh]`, `[gasp]`, `[cough]`, `[hmm]`, `[uh-huh]`, `[shh]`, `[whistle]` …, or `voice.sound("laugh")`) — performed by the same vocal tract, so every voice laughs, sighs and hums as itself; each for as long as you ask (`[laugh=3s]`), and a voice can laugh *while* it speaks (`[laughing]`, or the `laughter` setting)
 - **200 Hz lip-sync visemes, F0–F3 acoustics, and word/phoneme timings** included with every utterance
+
+### What's New in v1.2
+
+Consonants and voices fitted to how two real readers speak, measured sound by sound (`tools/phones.py`): 3.61 / 3.63 → 3.78 / 3.78 predicted naturalness and 8% / 8% → 7% / 7% phoneme error rate.
+
+- **Sharper upper formants**: the second and third resonances of every sound are narrower, more so in the male voice, so the formants stand out of the spectrum as a real voice's do.
+- **The "th" of *the*, *that*, *this*** after a pause or a consonant is a soft stop — silent for most of its length, the voice setting in at the release — instead of a buzzing fricative.
+- **/z/ really loses its voice** before a pause or another consonant (the rule existed; the voice bar kept buzzing through it), and before voiced consonants too.
+- **Dark /l/ before vowels** (*lazy*, *blue*), as American speakers have it, not a clear European one.
+- **/u/ after t d n s sh ch j y** (*too*, *do*, *new*, *you*) starts with the tongue still forward and glides back.
+- **Less hiss in /v/ and /f/**, and an /h/ between voiced sounds that keeps the voice going (male voice).
+- **Default voices**: tract length 17.0 cm (male, was 17.5) and 14.2 cm (female, was 13.9), closer to the readers' formants. The singer voices and presets with their own tract length are unchanged, and sung vowels keep their earlier resonance widths.
 
 ### What's New in v1.1
 
@@ -242,7 +254,7 @@ await voice.playScript(`
 `);
 ```
 
-Other names work too (`[haha]`, `[tee-hee]`, `[clearthroat]`, `[mwahaha]`). Each sound takes its place in `words` (as `"[laugh]"`) and in `segments` (with `sound: "laugh"`), so captions and lip-sync follow it; two laughs in one script are never the same laugh. The laugh follows what is measured in people — a train of short voiced calls about five a second, each followed by a puff of breath, the pitch around twice the speaking voice and sinking — and its numbers were set against an AudioSet tagger (`tools/sounds.py`), which hears laughter in all 20 laughs here (ten kinds, two voices) and puts the right name on 46 of the 68 renderings it is asked about. The cough, the breaths, the sneeze and the snore were reshaped against measurements of real recordings (how long, how fast they rise and die away, where their energy lies): a cough turned out to be air torn through the throat with very little voice in it, and it and the throat-clearing are now recognised. The sneeze, the snore, the sob and the sniff are not yet: they have the measured shape but are still stylised.
+Other names work too (`[haha]`, `[tee-hee]`, `[clearthroat]`, `[mwahaha]`). Each sound takes its place in `words` (as `"[laugh]"`) and in `segments` (with `sound: "laugh"`), so captions and lip-sync follow it; two laughs in one script are never the same laugh. The laugh follows what is measured in people — a train of short voiced calls about five a second, each followed by a puff of breath, the pitch around twice the speaking voice and sinking — and its numbers were set against an AudioSet tagger (`tools/sounds.py`), which hears laughter in all 20 laughs here (ten kinds, two voices) and puts the right name on 48 of the 68 renderings it is asked about. The cough, the breaths, the sneeze and the snore were reshaped against measurements of real recordings (how long, how fast they rise and die away, where their energy lies): a cough turned out to be air torn through the throat with very little voice in it, and it and the throat-clearing are now recognised. The sneeze, the snore, the sob and the sniff are not yet: they have the measured shape but are still stylised.
 
 ---
 
@@ -297,7 +309,7 @@ TTS.noteToHz("F#4");                                // 369.994…
 | Control | Range | Effect |
 |---|---|---|
 | `pitchHz` | `60–350` | Average fundamental frequency (male ≈ `85–145`, female ≈ `165–250`) |
-| `tractLengthCm` | `12.2–21.5` | Vocal-tract length; shorter raises formants (male ≈ `17.5`, female ≈ `14.2`) |
+| `tractLengthCm` | `12.2–21.5` | Vocal-tract length; shorter raises formants (male ≈ `17.0`, female ≈ `14.2`) |
 | `speed` | `0.55–1.75` | Speaking rate multiplier |
 | `expressiveness` | `0–3` | Intonation contour depth (`0` = monotone, `1` = natural lively default) |
 | `warmth` | `0–1` | Softer vocal-fold closure |
@@ -363,19 +375,21 @@ Because `tts.wasm` has **zero host imports**, any WebAssembly runtime (`wasmtime
 ## How It Works & Benchmarks
 
 1. **Text & Normalization** (`src/text.rs`, `src/lexicon.rs`, `src/g2p.rs`, `src/plan.rs`): Expands currency, dates, times, fractions, units, abbreviations, and Roman numerals; looks up words in a compact 22k-exception lexicon + learned G2P rules covering the 50,000 most common English words at **99.75%** dictionary accuracy.
-2. **Prosody & Allophones** (`src/plan.rs`, `src/durations.rs`, `src/timeline.rs`): Three weights of word — content words are said in full and accented, pronouns and auxiliaries (`he`, `would`, `have`) are hurried through like `the` and `of`, longer prepositions and conjunctions keep their form but not an accent, and a pronoun at the end of a phrase leaves the main accent to the verb (`I *saw* him`) — with phone durations fitted to two readers for each, phrase-final lengthening, alveolar flaps (`water`, `butter`), front/back velars with a compact burst, clear/dark `/l/`, and three-phase sentence breaths.
+2. **Prosody & Allophones** (`src/plan.rs`, `src/durations.rs`, `src/timeline.rs`): Three weights of word — content words are said in full and accented, pronouns and auxiliaries (`he`, `would`, `have`) are hurried through like `the` and `of`, longer prepositions and conjunctions keep their form but not an accent, and a pronoun at the end of a phrase leaves the main accent to the verb (`I *saw* him`) — with phone durations fitted to two readers for each, phrase-final lengthening, alveolar flaps (`water`, `butter`), front/back velars with a compact burst, a dark `/l/` in onset and coda, the stop-like "th" of `the` after a pause or consonant, `/z/` that gives up its voice before a consonant, a `/u/` that glides back from the front after `t d n s`, and three-phase sentence breaths.
 3. **Coarticulation & Intonation** (`src/frames.rs`, `src/sing.rs`): Class-specific formant transitions, diphthong trajectories, expressive statement/question/continuation F0 contours, plus singing portamento, bloom vibrato, and Sundberg high-pitch jaw/$F_1$ tracking.
-4. **Glottal Source & Vocal-Tract Cascade** (`src/render.rs`, `src/folds.rs`): Band-limited Liljencrants-Fant glottal pulses (with female posterior-chink spectral tilt and vowel-offset abduction) or physical 2-mass Ishizaka-Flanagan vocal folds driving a 5-formant cascade, nasal pole-zero branch, fricative/burst resonators, and studio room reflection.
+4. **Glottal Source & Vocal-Tract Cascade** (`src/render.rs`, `src/folds.rs`): Band-limited Liljencrants-Fant glottal pulses (with female posterior-chink spectral tilt and vowel-offset abduction) or physical 2-mass Ishizaka-Flanagan vocal folds driving a 5-formant cascade (its second and third resonances as sharp as a real voice's, not the textbook widths), nasal pole-zero branch, fricative/burst resonators, and studio room reflection.
 5. **Laughter & Vocal Sounds** (`src/vocal.rs`, `src/frames.rs`): Each sound is a short performance for the same renderer — poses for pitch, mouth, voice, breath and hiss — plus a whistled tone for the two sounds made by the air in the mouth rather than the folds. A duration is met by performing more or less of it. Laughing while speaking works on the frames of the speech itself: the pitch lifts, the formants move as the lips spread, and laugh calls are cut into the stressed vowels and added after the sentence.
 
 Measured on held-out sentences against real human recordings (CMU Arctic):
 
-| Metric | Original Port | TTS v1.0 | TTS v1.1 | Human Recordings |
-|---|---|---|---|---|
-| Phoneme error rate (male / female) | 38% / 44% | 9% / 8% | **8% / 8%** | 8–10% |
-| Predicted naturalness, UTMOS 1–5 (male / female) | 2.69 / 2.38 | 3.55 / 3.59 | **3.61 / 3.63** | 4.3 |
+| Metric | Original Port | TTS v1.0 | TTS v1.1 | TTS v1.2 | Human Recordings |
+|---|---|---|---|---|---|
+| Phoneme error rate (male / female) | 38% / 44% | 9% / 8% | 8% / 8% | **7% / 7%** | 8–10% |
+| Predicted naturalness, UTMOS 1–5 (male / female) | 2.69 / 2.38 | 3.55 / 3.59 | 3.61 / 3.63 | **3.78 / 3.78** | 4.3 |
 
 The step from v1.0 comes from how words are weighted (pronouns and auxiliaries no longer accented and dwelt on), a duration model refitted for it, compact /k g/ bursts and steadier loudness from word to word. Those held-out sentences were looked at while it was made; on 30 further sentences that no tuning has seen, the same step is +0.03 / +0.08 naturalness and 1.8 / 2.6 points fewer misheard sounds.
+
+The step from v1.1 to v1.2 comes from looking inside the sounds rather than at whole sentences (`tools/phones.py`): the level through every consonant, and the formants of every vowel and glide, in two readers and in the synthesizer on up to 300 of the same sentences. Where both readers differed from the synthesizer in the same way, the rule was changed and kept only if the two judges above agreed (several faithful changes were not kept: unreleased stops before consonants lost intelligibility, louder nasals lost naturalness). On 30 newly written sentences that none of it has seen, the step is +0.17 / +0.09 naturalness and 2.0 / 0.0 points fewer misheard sounds.
 
 ---
 
@@ -388,6 +402,7 @@ npm run build      # builds pkg/ AND an upload-ready static site in dist/
 npm test           # runs Rust release unit tests + Node WASM smoke tests
 npm run demo       # starts local studio at http://localhost:8080/demo/
 python tools/sounds.py check   # what an AudioSet tagger hears in every laugh, sigh and cough
+python tools/phones.py levels  # each consonant's level through time, next to two real readers
 
 # Native CLI example:
 cargo run --release --example say -- --voice female "Hello from TTS!" hello.wav
